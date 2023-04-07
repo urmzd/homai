@@ -2,7 +2,13 @@
 
 ## Prerequisities
 
-Tested On:
+```bash
+# install docker compose
+# install aws-cli
+# install cdk
+```
+
+Tested Using:
 - Zigbee 3.0 USB Dongle Plus
 - Syvania A19 70052
 
@@ -13,7 +19,7 @@ Tested On:
 docker compose up
 
 # CLI
-./sunlight-lamp increase
+./sunrise-lamp increase
 ```
 
 ## Notes
@@ -51,4 +57,22 @@ General:
 - Secrets Manager
 - IOT Core
 - CloudWatch Events (schedule events)
+
+```go
+type Config struct {
+    Brightness: uint8 // between 0 - 10, 0 will set ON: false, and 1-10 will set ON: true
+    Sunrise: {
+        Set: bool,
+        Start: time
+        End: time
+        Brightness: uint8 // Goes from current to this value.
+    },
+    Sunset: {
+        Set: bool
+        Start: time
+        End: time
+        Brightness: uint8 // Goes from current to this value.
+    }
+}
+```
 

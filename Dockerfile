@@ -13,7 +13,7 @@ RUN touch /mosquitto/config/mosquitto_passwd && \
     mosquitto_passwd -b /mosquitto/config/mosquitto_passwd ${MQTT_USERNAME} ${MQTT_PASSWORD}
 
 # Copy configuration file
-COPY mosquitto/config/mosquitto.conf /mosquitto/config/mosquitto.conf
+COPY configs/mosquitto/config/mosquitto.conf /mosquitto/config/mosquitto.conf
 
 # Set the entrypoint
 ENTRYPOINT ["mosquitto", "-c", "/mosquitto/config/mosquitto.conf"]

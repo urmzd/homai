@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -11,55 +12,36 @@ import (
 )
 
 var (
-	increaseCmd = &cobra.Command{
-		Use:   "increase",
-		Short: "Increase brightness",
+	setCmd = &cobra.Command{
+		Use:   "set [value]",
+		Short: "Set brightness",
+		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			controlBrightness(mqttServer, mqttUsername, mqttPassword, deviceFriendlyName, "increase")
+			value, _ := strconv.Atoi(args[0])
+			client:= NewClient(mqttServer, mqttUsername, mqttPassword)
+			controlBrightness(client, deviceFriendlyName, value)
 		},
 	}
 
-	decreaseCmd = &cobra.Command{
-		Use:   "decrease",
-		Short: "Decrease brightness",
+	getCmd = &cobra.Command{
+		Use:   "get",
+		Short: "Get current brightness",
 		Run: func(cmd *cobra.Command, args []string) {
-			controlBrightness(mqttServer, mqttUsername, mqttPassword, deviceFriendlyName, "decrease")
-		},
-	}
-
-	turnOnCmd = &cobra.Command{
-		Use:   "on",
-		Short: "Turn on the device",
-		Run: func(cmd *cobra.Command, args []string) {
-			controlState(mqttServer, mqttUsername, mqttPassword, deviceFriendlyName, "ON")
-		},
-	}
-
-	turnOffCmd = &cobra.Command{
-		Use:   "off",
-		Short: "Turn off the device",
-		Run: func(cmd *cobra.Command, args []string) {
-			controlState(mqttServer, mqttUsername, mqttPassword, deviceFriendlyName, "OFF")
+			client := NewClient(mqttServer, mqttUsername, mqttPassword)
+			getCurrentBrightness(client, deviceFriendlyName)
 		},
 	}
 )
 
 func init() {
-	rootCmd.AddCommand(increaseCmd)
-	rootCmd.AddCommand(decreaseCmd)
-	rootCmd.AddCommand(turnOnCmd)
-	rootCmd.AddCommand(turnOffCmd)
+	rootCmd.AddCommand(setCmd)
+	rootCmd.AddCommand(getCmd)
 }
 
 func setBrightness(client mqtt.Client, device string, brightness int) {
+	scaledBrightness := scaleBrightness(brightness)
 	message := make(map[string]int)
-	message["brightness"] = brightness
-	client.Publish("zigbee2mqtt/"+device+"/set", 0, false, toJSON(message))
-}
-
-func setState(client mqtt.Client, device, state string) {
-	message := make(map[string]string)
-	message["state"] = state
+	message["brightness"] = scaledBrightness
 	client.Publish("zigbee2mqtt/"+device+"/set", 0, false, toJSON(message))
 }
 
@@ -71,7 +53,28 @@ func toJSON(obj interface{}) string {
 	return string(bytes)
 }
 
-func getCurrentBrightness(client mqtt.Client, device string) (int, error) {
+func scaleBrightness(value int) int {
+	return int(float64(value) * (255.0 / 10.0))
+}
+
+func NewClient(server string, user string, pass string) mqtt.Client {
+	opts := mqtt.NewClientOptions().AddBroker(server).SetUsername(user).SetPassword(pass)
+	client := mqtt.NewClient(opts)
+	token := client.Connect()
+	token.Wait()
+
+	return client
+}
+
+func controlBrightness(client mqtt.Client, device string, value int) {
+	token := client.Connect()
+	token.Wait()
+	setBrightness(client, device, value)
+
+	client.Disconnect(250)
+}
+
+func getCurrentBrightness(client mqtt.Client, device string) {
 	var brightness int
 	messageChannel := make(chan mqtt.Message)
 
@@ -81,7 +84,8 @@ func getCurrentBrightness(client mqtt.Client, device string) (int, error) {
 	token.Wait()
 
 	if token.Error() != nil {
-		return 0, token.Error()
+		log.Error().Msgf("Error subscribing to topic: %v", token.Error())
+		return
 	}
 
 	getPayload := map[string]string{
@@ -93,7 +97,8 @@ func getCurrentBrightness(client mqtt.Client, device string) (int, error) {
 	case msg := <-messageChannel:
 		var deviceData map[string]interface{}
 		if err := json.Unmarshal(msg.Payload(), &deviceData); err != nil {
-			return 0, err
+			log.Error().Msgf("Error unmarshalling device data: %v", err)
+			return
 		}
 		log.Info().Msgf("Device data: %v", deviceData)
 		if b, ok := deviceData["brightness"].(float64); ok {
@@ -101,54 +106,10 @@ func getCurrentBrightness(client mqtt.Client, device string) (int, error) {
 		}
 	case <-time.After(5 * time.Second):
 		log.Info().Msg("Timeout waiting for brightness")
-		return 0, fmt.Errorf("timeout waiting for brightness")
+		return
 	}
 
 	client.Unsubscribe("zigbee2mqtt/" + device)
 
-	return brightness, nil
-}
-
-func controlBrightness(server, user, pass, device, action string) {
-	opts := mqtt.NewClientOptions().AddBroker(server).SetUsername(user).SetPassword(pass)
-	client := mqtt.NewClient(opts)
-	token := client.Connect()
-	token.Wait()
-
-	currentBrightness, err := getCurrentBrightness(client, device)
-	if err != nil {
-		log.Error().Err(err).Msg("Error getting current brightness")
-		client.Disconnect(250)
-		return
-	}
-
-	log.Info().Msgf("Current brightness: %d", currentBrightness)
-
-	switch action {
-	case "increase":
-		newBrightness := currentBrightness + 12
-		if newBrightness > 255 {
-			newBrightness = 255
-		}
-		setBrightness(client, device, newBrightness)
-	case "decrease":
-		newBrightness := currentBrightness - 12
-		if newBrightness < 0 {
-			newBrightness = 0
-		}
-		setBrightness(client, device, newBrightness)
-	}
-
-	client.Disconnect(250)
-}
-
-func controlState(server, user, pass, device, state string) {
-	opts := mqtt.NewClientOptions().AddBroker(server).SetUsername(user).SetPassword(pass)
-	client := mqtt.NewClient(opts)
-	token := client.Connect()
-	token.Wait()
-
-	setState(client, device, state)
-
-	client.Disconnect(250)
+	fmt.Printf("%d", brightness)
 }

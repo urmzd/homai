@@ -32,6 +32,7 @@ export class SunriseLampStack extends cdk.Stack {
       privateDnsEnabled: true,
       subnets: vpc.selectSubnets({
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        onePerAz: true
       })
     })
 
@@ -40,6 +41,16 @@ export class SunriseLampStack extends cdk.Stack {
       privateDnsEnabled: true,
       subnets: vpc.selectSubnets({
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        onePerAz: true
+      })
+    })
+
+    vpc.addInterfaceEndpoint("ECRDockerEndpoint", {
+      service: ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
+      privateDnsEnabled: true,
+      subnets: vpc.selectSubnets({
+        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        onePerAz: true
       })
     })
 
@@ -48,6 +59,7 @@ export class SunriseLampStack extends cdk.Stack {
       privateDnsEnabled: true,
       subnets: vpc.selectSubnets({
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        onePerAz: true
       })
     })
 
@@ -56,6 +68,7 @@ export class SunriseLampStack extends cdk.Stack {
       privateDnsEnabled: true,
       subnets: vpc.selectSubnets({
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        onePerAz: true
       })
     })
 
@@ -64,6 +77,7 @@ export class SunriseLampStack extends cdk.Stack {
       privateDnsEnabled: true,
       subnets: vpc.selectSubnets({
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        onePerAz: true
       })
     })
 
@@ -72,6 +86,7 @@ export class SunriseLampStack extends cdk.Stack {
       privateDnsEnabled: true,
       subnets: vpc.selectSubnets({
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        onePerAz: true
       })
     })
 
@@ -80,15 +95,26 @@ export class SunriseLampStack extends cdk.Stack {
       privateDnsEnabled: true,
       subnets: vpc.selectSubnets({
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        onePerAz: true
       })
     })
 
     vpc.addInterfaceEndpoint("CloudWatchLogsEndpoint", {
       service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
+      privateDnsEnabled: true, 
+      subnets: vpc.selectSubnets({
+        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        onePerAz: true
+      })
     });
 
     vpc.addInterfaceEndpoint("EC2MessagesEndpoint", {
       service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES,
+      privateDnsEnabled: true,
+      subnets: vpc.selectSubnets({
+        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        onePerAz: true
+      })
     });
 
     // Define S3 bucket for the configuration file

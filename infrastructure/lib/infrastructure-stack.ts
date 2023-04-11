@@ -51,7 +51,7 @@ export class InfrastructureStack extends cdk.Stack {
 
     taskDefinition
       .addContainer("MQTTBrokerContainer", {
-        image: ecs.ContainerImage.fromAsset("../"),
+        image: ecs.ContainerImage.fromAsset("../../"),
         environment: {
           MQTT_USERNAME: mqttCreds.secretValueFromJson("username").toString(),
           MQTT_PASSWORD: mqttCreds.secretValueFromJson("password").toString(),
@@ -73,14 +73,14 @@ export class InfrastructureStack extends cdk.Stack {
       },
     });
 
-    // Define Lambda functions
+    // We call this function several times as scheduled by the schedule lambda.
     const increaseFunction = new lambda.Function(
       this,
       "LambdaIncreaseFunction",
       {
         runtime: lambda.Runtime.GO_1_X,
         handler: "main",
-        code: lambda.Code.fromAsset("../increase"),
+        code: lambda.Code.fromAsset("../../cmd/increase"),
         environment: {
           CONFIG_BUCKET_NAME: configBucket.bucketName,
         },
@@ -91,13 +91,15 @@ export class InfrastructureStack extends cdk.Stack {
       }
     );
 
+    // This is scheduled every day at midnight, and schedules multiple increases for sunrise and sunset.
+    // We number the invocations to prevent redundant logic from running.
     const scheduleFunction = new lambda.Function(
       this,
       "LambdaScheduleFunction",
       {
         runtime: lambda.Runtime.GO_1_X,
         handler: "main",
-        code: lambda.Code.fromAsset("../schedule"),
+        code: lambda.Code.fromAsset("../../cmd/schedule"),
         environment: {
           INCREASE_FUNCTION_ARN: increaseFunction.functionArn,
         },

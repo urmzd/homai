@@ -75,7 +75,7 @@ func scaleBrightness(value int) int {
 }
 
 
-func GetCurrentBrightness(client mqtt.Client, device string) {
+func GetCurrentBrightness(client mqtt.Client, device string) int {
 	var brightness int
 	messageChannel := make(chan mqtt.Message)
 
@@ -86,7 +86,7 @@ func GetCurrentBrightness(client mqtt.Client, device string) {
 
 	if token.Error() != nil {
 		log.Error().Msgf("Error subscribing to topic: %v", token.Error())
-		return
+		return 0
 	}
 
 	getPayload := map[string]string{
@@ -99,7 +99,7 @@ func GetCurrentBrightness(client mqtt.Client, device string) {
 		var deviceData map[string]interface{}
 		if err := json.Unmarshal(msg.Payload(), &deviceData); err != nil {
 			log.Error().Msgf("Error unmarshalling device data: %v", err)
-			return
+			return 0
 		}
 		log.Info().Msgf("Device data: %v", deviceData)
 		if b, ok := deviceData["brightness"].(float64); ok {
@@ -107,12 +107,13 @@ func GetCurrentBrightness(client mqtt.Client, device string) {
 		}
 	case <-time.After(5 * time.Second):
 		log.Info().Msg("Timeout waiting for brightness")
-		return
+		return 0
 	}
 
 	client.Unsubscribe("zigbee2mqtt/" + device)
 
 	fmt.Printf("%d", brightness)
+	return brightness
 }
 
 var RootCmd = &cobra.Command{

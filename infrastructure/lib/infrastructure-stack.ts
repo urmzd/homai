@@ -11,7 +11,7 @@ import * as events from "aws-cdk-lib/aws-events"
 import * as lambda from "aws-cdk-lib/aws-lambda"
 import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 
-export class InfrastructureStack extends cdk.Stack {
+export class SunriseLampStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
@@ -120,6 +120,23 @@ export class InfrastructureStack extends cdk.Stack {
       iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore")
     );
 
+    // TODO: update wildcard afterwards.
+    taskExecutionRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          'ecr:GetAuthorizationToken',
+          'ecr:BatchCheckLayerAvailability',
+          'ecr:GetDownloadUrlForLayer',
+          'ecr:BatchGetImage',
+          'logs:CreateLogStream',
+          'logs:PutLogEvents',
+          'secretsmanager:GetSecretValue',
+          'kms:Decrypt',
+        ],
+        resources: ['*'],
+      }),
+    );
+
     const taskDefinition = new ecs.FargateTaskDefinition(
       this,
       "MQTTBrokerTask",
@@ -135,6 +152,8 @@ export class InfrastructureStack extends cdk.Stack {
 
     taskDefinition
       .addContainer("MQTTBrokerContainer", {
+        cpu: 256,
+        memoryLimitMiB: 512,
         secrets: {
           MQTT_USERNAME: ecs.Secret.fromSecretsManager(mqttCreds, "username"),
           MQTT_PASSWORD: ecs.Secret.fromSecretsManager(mqttCreds, "password"),

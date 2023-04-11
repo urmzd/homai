@@ -79,8 +79,8 @@ export class InfrastructureStack extends cdk.Stack {
       "LambdaIncreaseFunction",
       {
         runtime: lambda.Runtime.GO_1_X,
-        handler: "increase",
-        code: lambda.Code.fromAsset("../"),
+        handler: "main",
+        code: lambda.Code.fromAsset("../increase"),
         environment: {
           CONFIG_BUCKET_NAME: configBucket.bucketName,
         },
@@ -96,21 +96,21 @@ export class InfrastructureStack extends cdk.Stack {
       "LambdaScheduleFunction",
       {
         runtime: lambda.Runtime.GO_1_X,
-        handler: "schedule",
-        code: lambda.Code.fromAsset("../"),
+        handler: "main",
+        code: lambda.Code.fromAsset("../schedule"),
         environment: {
           INCREASE_FUNCTION_ARN: increaseFunction.functionArn,
         },
         vpc: vpc,
         vpcSubnets: {
-          subnetType: ec2.SubnetType.PUBLIC,
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
         },
       }
     );
 
     // Define EventBridge rule for midnight schedule
     const midnightRule = new events.Rule(this, "MidnightSchedule", {
-      schedule: events.Schedule.expression("cron(0 0 * * ? *)"),
+      schedule: events.Schedule.rate(cdk.Duration.days(1)),
     });
 
     // Add Lambda function as a target for the EventBridge rule

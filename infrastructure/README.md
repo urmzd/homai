@@ -1,36 +1,14 @@
-# Infrastructure
+# Welcome to your CDK TypeScript project
 
-## Overview
-DESIRED COMMANDS:
-- SET 
-- GET 
-- SET/DELETE SUNRISE
-- SET/DELETE SUNSET
+This is a blank project for CDK development with TypeScript.
 
-ECS Holding MQTT Broker
-CloudWatch Events (for SUNRISE/SUNSET)
-Secrets Manager
-Lambda 
-S3
-Step Functions
-CloudFormation (via CDK)
+The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
+## Useful commands
 
-```go
-type Config struct {
-    Brightness: uint8 // between 0 - 10, 0 will set ON: false, and 1-10 will set ON: true
-    Sunrise: {
-        Set: bool,
-        Start: time
-        End: time
-        Brightness: uint8 // Goes from current to this value.
-    },
-    Sunset: {
-        Set: bool
-        Start: time
-        End: time
-        Brightness: uint8 // Goes from current to this value.
-    }
-}
-```
-
+* `npm run build`   compile typescript to js
+* `npm run watch`   watch for changes and compile
+* `npm run test`    perform the jest unit tests
+* `cdk deploy`      deploy this stack to your default AWS account/region
+* `cdk diff`        compare deployed stack with current state
+* `cdk synth`       emits the synthesized CloudFormation template

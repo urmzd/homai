@@ -5,9 +5,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        MQTT_USERNAME: root
-        MQTT_PASSWORD: pass
+    environment:
+      MQTT_USERNAME: root
+      MQTT_PASSWORD: pass
     ports:
       - "1883:1883"
       - "9001:9001"

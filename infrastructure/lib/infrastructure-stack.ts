@@ -226,10 +226,15 @@ export class SunriseLampStack extends cdk.Stack {
       protocol: elbv2.Protocol.TCP,
     });
 
+
     // Add the MQTT broker as a target for the listener
     mqttListener.addTargets("MQTTBrokerTarget", {
       port: 1883,
       targets: [mqttBroker],
+      healthCheck: {
+        path: "/",
+        port: "8080",
+      }
     });
 
     const coreEnv = {

@@ -54,10 +54,10 @@ func handler(ctx context.Context, event events.CloudWatchEvent) error {
 		return err
 	}
 
-	pkg.MqttUsername = mqttCredentials.Username
+	pkg.MqttUser = mqttCredentials.User
 	pkg.MqttPassword = mqttCredentials.Password
 
-	client := pkg.NewClient(pkg.MqttServer, pkg.MqttUsername, pkg.MqttPassword)
+	client := pkg.NewClient(pkg.MqttServer, pkg.MqttUser, pkg.MqttPassword)
 	currentBrightness := pkg.GetCurrentBrightness(client, pkg.DeviceFriendlyName)
 
 	s3Client := s3.NewFromConfig(cfg)

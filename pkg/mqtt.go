@@ -7,7 +7,7 @@ import (
 
 var (
 	MqttServer          string
-	MqttUsername        string
+	MqttUser        string
 	MqttPassword        string
 	DeviceFriendlyName  string
 )

@@ -1,9 +1,9 @@
 permit_join: true
 mqtt:
   base_topic: zigbee2mqtt
-  server: mqtt://mqtt
+  server: mqtt://localhost:1883
   user: root
-  password: pass
+  password: '!asHD27o-nB)CQ0y~mBmqmP@e%pzL6!b'
 serial:
   port: /dev/ttyUSB0
 frontend:

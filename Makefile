@@ -10,14 +10,14 @@ MAIN_GO_FILES := $(shell find cmd -type f -name main.go)
 # Define the binary output files based on the main.go files
 BINARIES := $(patsubst cmd/%/main.go,bin/%,$(MAIN_GO_FILES))
 
-# Build ARM64 binaries
+# Build AMD64 binaries
 build: $(BINARIES)
 
 # Rule to build each ARM64 binary
 bin/%: cmd/%/main.go
 	@echo "Building $@"
 	@mkdir -p $(dir $@)
-	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o $@ $<
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o $@ $<
 
 # Clean the bin directory
 clean:

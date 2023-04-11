@@ -12,7 +12,7 @@ var (
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			value, _ := strconv.Atoi(args[0])
-			client:= NewClient(MqttServer, MqttUsername, MqttPassword)
+			client:= NewClient(MqttServer, MqttUser, MqttPassword)
 			SetBrightness(client, DeviceFriendlyName, value)
 		},
 	}
@@ -21,7 +21,7 @@ var (
 		Use:   "get",
 		Short: "Get current brightness",
 		Run: func(cmd *cobra.Command, args []string) {
-			client := NewClient(MqttServer, MqttUsername, MqttPassword)
+			client := NewClient(MqttServer, MqttUser, MqttPassword)
 			GetCurrentBrightness(client, DeviceFriendlyName)
 		},
 	}
@@ -37,7 +37,7 @@ var RootCmd = &cobra.Command{
 	Short: "Control Sylvania A19 lightbulb using MQTT",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		MqttServer, _ = cmd.Flags().GetString("mqtt-server")
-		MqttUsername, _ = cmd.Flags().GetString("mqtt-username")
+		MqttUser, _ = cmd.Flags().GetString("mqtt-user")
 		MqttPassword, _ = cmd.Flags().GetString("mqtt-password")
 		DeviceFriendlyName, _ = cmd.Flags().GetString("device-friendly-name")
 	},

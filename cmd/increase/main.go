@@ -22,11 +22,11 @@ func handler(ctx context.Context, event events.CloudWatchEvent) error {
 	}
 
 	pkg.MqttServer = os.Getenv("MQTT_SERVER")
-	pkg.MqttUsername = os.Getenv("MQTT_USERNAME")
+	pkg.MqttUser = os.Getenv("MQTT_USER")
 	pkg.MqttPassword = os.Getenv("MQTT_PASSWORD")
 	pkg.DeviceFriendlyName = os.Getenv("DEVICE_FRIENDLY_NAME")
 
-	client := pkg.NewClient(pkg.MqttServer, pkg.MqttUsername, pkg.MqttPassword)
+	client := pkg.NewClient(pkg.MqttServer, pkg.MqttUser, pkg.MqttPassword)
 	currentBrightness := pkg.GetCurrentBrightness(client, pkg.DeviceFriendlyName)
 
 	if currentBrightness < increaseEvent.TargetBrightness {

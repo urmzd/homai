@@ -8,7 +8,7 @@ import (
 )
 
 type MqttCredentials struct {
-	Username string `json:"username"`
+	User string `json:"user"`
 	Password string `json:"password"`
 }
 

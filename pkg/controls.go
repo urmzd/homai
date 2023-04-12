@@ -14,8 +14,11 @@ func SetBrightness(client mqtt.Client, device string, brightness int) {
 	scaledBrightness := scaleBrightness(brightness)
 	message := make(map[string]int)
 	message["brightness"] = scaledBrightness
-	client.Publish("zigbee2mqtt/"+device+"/set", 0, false, toJSON(message))
-	client.Disconnect(250)
+	token := client.Publish("zigbee2mqtt/"+device+"/set", 0, false, toJSON(message))
+	token.Wait()
+	if token.Error() != nil {
+		log.Error().Msgf("Error publishing to topic: %v", token.Error())
+	}
 }
 
 

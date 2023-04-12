@@ -23,6 +23,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - 8081:8081
+      - 9000:8080
       - 1883:1883
     environment:
       MQTT_USER: "${USER}"

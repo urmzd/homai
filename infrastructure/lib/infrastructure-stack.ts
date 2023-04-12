@@ -190,11 +190,19 @@ export class SunriseLampStack extends cdk.Stack {
         }),
       })
       .addPortMappings(
+        // MQTT
         {
           containerPort: 1883,
           hostPort: 1883,
           protocol: ecs.Protocol.TCP,
         },
+        // Health check
+        {
+          containerPort: 8081,
+          hostPort: 8081,
+          protocol: ecs.Protocol.TCP,
+        },
+        // Websocket
         {
           containerPort: 8081,
           hostPort: 8081,
@@ -211,7 +219,7 @@ export class SunriseLampStack extends cdk.Stack {
       }
     );
 
-    mqttBrokerSg.connections.allowFromAnyIpv4(ec2.Port.tcp(1883));
+    mqttBrokerSg.connections.allowFromAnyIpv4(ec2.Port.tcp(8080));
     mqttBrokerSg.connections.allowFromAnyIpv4(ec2.Port.tcp(8081));
 
     const mqttBroker = new ecs.FargateService(this, "MQTTBrokerService", {
@@ -234,8 +242,8 @@ export class SunriseLampStack extends cdk.Stack {
       }
     );
 
-    mqttLoadBalancerSg.connections.allowFromAnyIpv4(ec2.Port.tcp(1883));
-    mqttLoadBalancerSg.connections.allowTo(mqttBrokerSg, ec2.Port.tcp(1883));
+    mqttLoadBalancerSg.connections.allowFromAnyIpv4(ec2.Port.tcp(8080))
+    mqttLoadBalancerSg.connections.allowTo(mqttBrokerSg, ec2.Port.tcp(8080));
     mqttLoadBalancerSg.connections.allowTo(mqttBrokerSg, ec2.Port.tcp(8081));
 
     // Create an Application Load Balancer
@@ -249,17 +257,15 @@ export class SunriseLampStack extends cdk.Stack {
       }
     );
 
-    mqttLoadBalancer.connections.allowFromAnyIpv4(ec2.Port.tcp(1883));
-
     // Add a listener to the Application Load Balancer
     const mqttListener = mqttLoadBalancer.addListener("MQTTListener", {
-      port: 1883,
+      port: 8080,
       protocol: elbv2.ApplicationProtocol.HTTP,
     });
 
     // Add the MQTT broker as a target for the listener
     mqttListener.addTargets("MQTTBrokerTarget", {
-      port: 1883,
+      port: 8080,
       protocol: elbv2.ApplicationProtocol.HTTP,
       targets: [mqttBroker],
       healthCheck: {
@@ -275,7 +281,7 @@ export class SunriseLampStack extends cdk.Stack {
 
     const coreEnv = {
       CONFIG_BUCKET: configBucket.bucketName,
-      SERVER: `mqtt://${mqttLoadBalancer.loadBalancerDnsName}:1883`,
+      SERVER: `ws://${mqttLoadBalancer.loadBalancerDnsName}:8080`,
       CREDS: mqttCreds.secretArn,
     };
 
@@ -288,7 +294,7 @@ export class SunriseLampStack extends cdk.Stack {
       allowAllOutbound: true,
     });
 
-    mqttLoadBalancerSg.connections.allowFrom(controlSg, ec2.Port.tcp(1883));
+    mqttLoadBalancerSg.connections.allowFrom(controlSg, ec2.Port.tcp(8080));
 
     // We call this function several times as scheduled by the schedule lambda.
     const controlLambda = new lambda.Function(this, "control", {

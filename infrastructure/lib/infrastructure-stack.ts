@@ -174,7 +174,6 @@ export class SunriseLampStack extends cdk.Stack {
     );
 
     const imagePath = path.resolve(process.cwd(), "../configs/mosquitto");
-    console.log(imagePath);
 
     taskDefinition
       .addContainer("MQTTBrokerContainer", {
@@ -232,9 +231,12 @@ export class SunriseLampStack extends cdk.Stack {
       "MQTTLoadBalancerSecurityGroup",
       {
         vpc,
-        allowAllOutbound: true,
       }
     );
+
+    mqttLoadBalancerSg.connections.allowFromAnyIpv4(ec2.Port.tcp(1883));
+    mqttLoadBalancerSg.connections.allowTo(mqttBrokerSg, ec2.Port.tcp(1883));
+    mqttLoadBalancerSg.connections.allowTo(mqttBrokerSg, ec2.Port.tcp(8081));
 
     // Create an Application Load Balancer
     const mqttLoadBalancer = new elbv2.ApplicationLoadBalancer(
@@ -286,7 +288,7 @@ export class SunriseLampStack extends cdk.Stack {
       allowAllOutbound: true,
     });
 
-    mqttLoadBalancerSg.connections.allowTo(controlSg, ec2.Port.tcp(1883));
+    mqttLoadBalancerSg.connections.allowFrom(controlSg, ec2.Port.tcp(1883));
 
     // We call this function several times as scheduled by the schedule lambda.
     const controlLambda = new lambda.Function(this, "control", {

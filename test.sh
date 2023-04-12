@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 function cleanup {
-  echo "Cleaning up SSM port forwarding..."
-  kill %1
+  ./bin/cli --mqtt-password "$ZIGBEE2MQTT_CONFIG_MQTT_PASSWORD" --mqtt-user "$ZIGBEE2MQTT_CONFIG_MQTT_USER" set 0
   docker kill zigbee2mqtt
   docker rm zigbee2mqtt
+  kill %1
 }
 
 trap cleanup EXIT
@@ -31,8 +31,6 @@ ZIGBEE2MQTT_CONFIG_MQTT_PASSWORD=$(echo "$SECRET" | jq -r '.password')
 
 echo "$ZIGBEE2MQTT_CONFIG_MQTT_USER"
 echo "$ZIGBEE2MQTT_CONFIG_MQTT_PASSWORD"
-
-./bin/cli --mqtt-password "$ZIGBEE2MQTT_CONFIG_MQTT_PASSWORD" --mqtt-user "$ZIGBEE2MQTT_CONFIG_MQTT_USER" set 0
 
 docker run -d \
   --name zigbee2mqtt \

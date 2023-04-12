@@ -11,8 +11,8 @@ services:
       - /dev/ttyUSB0:/dev/ttyUSB0
     environment:
       TZ: America/Toronto
-      ZIGBEE2MQTT_CONFIG_MQTT_USER: ${USER}
-      ZIGBEE2MQTT_CONFIG_MQTT_PASSWORD: ${PASSWORD}
+      ZIGBEE2MQTT_CONFIG_MQTT_USER: "${USER}"
+      ZIGBEE2MQTT_CONFIG_MQTT_PASSWORD: "${PASSWORD}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -20,11 +20,13 @@ services:
     container_name: mqtt
     build:
       context: "configs/mosquitto"
+      dockerfile: Dockerfile
     ports:
       - 8081:8081
       - 1883:1883
     environment:
-      MQTT_USER: ${USER}
-      MQTT_PASSWORD: ${PASSWORD}
+      MQTT_USER: "${USER}"
+      MQTT_PASSWORD: "${PASSWORD}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    restart: unless-stopped

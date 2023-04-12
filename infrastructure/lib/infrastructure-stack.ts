@@ -136,6 +136,7 @@ export class SunriseLampStack extends cdk.Stack {
 
     const mqttCreds = new secretsmanager.Secret(this, "MqttCreds", {
       generateSecretString: {
+        excludePunctuation: true,
         secretStringTemplate: JSON.stringify({
           user: "root",
         }),

@@ -4,4 +4,4 @@ import * as cdk from "aws-cdk-lib";
 import { SunriseLampStack } from "../lib/infrastructure-stack";
 
 const app = new cdk.App();
-new SunriseLampStack(app, "SunriseLampV2", {});
+new SunriseLampStack(app, "SunriseLampV1", {});

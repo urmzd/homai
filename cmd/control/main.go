@@ -7,16 +7,17 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	pkg "github.com/urmzd/sunrise-lamp/pkg"
 )
 
-type IncreaseEvent struct {
-	CustomName int `json:"name"`
+type ControlEvent struct {
+	Name  string `json:"name"`
 	Level int `json:"level"`
 }
 
@@ -36,11 +37,11 @@ func getDeviceName(ctx context.Context, name string) (string, error) {
 
 	tableName := os.Getenv("DEVICE_MAPPING_TABLE")
 
-	result, err := dbClient.GetItem(&dynamodb.GetItemInput{
+	result, err := dbClient.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: &tableName,
-		Key: map[string]*dynamodb.AttributeValue{
-			"Name": {
-				S: &name,
+		Key: map[string]types.AttributeValue{
+			"Name": &types.AttributeValueMemberS{
+				Value: name,
 			},
 		},
 	})
@@ -63,15 +64,14 @@ func getDeviceName(ctx context.Context, name string) (string, error) {
 	return deviceMapping.DeviceName, nil
 }
 
-
 func handler(ctx context.Context, event events.CloudWatchEvent) error {
-	var increaseEvent IncreaseEvent
-	err := json.Unmarshal(event.Detail, &increaseEvent)
+	var controlEvent ControlEvent
+	err := json.Unmarshal(event.Detail, &controlEvent)
 	if err != nil {
 		return err
 	}
 
-	deviceName, err := getDeviceName(increaseEvent.CustomName)
+	deviceName, err := getDeviceName(ctx, controlEvent.Name)
 	if err != nil {
 		return err
 	}

@@ -1,5 +1,4 @@
 import * as cdk from "aws-cdk-lib";
-import * as s3 from "aws-cdk-lib/aws-s3";
 import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
@@ -7,10 +6,9 @@ import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import { Construct } from "constructs";
 import * as path from "node:path";
 import * as iam from "aws-cdk-lib/aws-iam";
-import * as events from "aws-cdk-lib/aws-events";
 import * as lambda from "aws-cdk-lib/aws-lambda";
-import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import { writeFileSync } from "fs";
 
 export class SunriseLampStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -131,9 +129,6 @@ export class SunriseLampStack extends cdk.Stack {
       }),
     });
 
-    // Define S3 bucket for the configuration file
-    const configBucket = new s3.Bucket(this, "ConfigBucket");
-
     // Define ECS cluster and service in the private subnet
     const cluster = new ecs.Cluster(this, "MQTTBrokerCluster", {
       vpc: vpc,
@@ -173,8 +168,8 @@ export class SunriseLampStack extends cdk.Stack {
         taskRole: taskRole,
 
         executionRole: taskExecutionRole,
-        memoryLimitMiB: 512,
-        cpu: 256,
+        memoryLimitMiB: 1024,
+        cpu: 512,
       }
     );
 
@@ -195,18 +190,29 @@ export class SunriseLampStack extends cdk.Stack {
           streamPrefix: "mqtt-broker",
         }),
       })
-      .addPortMappings(
-        {
-          containerPort: 1883,
-          hostPort: 1883,
-          protocol: ecs.Protocol.TCP,
-        },
-        {
-          containerPort: 8080,
-          hostPort: 8080,
-          protocol: ecs.Protocol.TCP,
-        }
-      );
+      .addPortMappings({
+        containerPort: 1883,
+        hostPort: 1883,
+        protocol: ecs.Protocol.TCP,
+      });
+
+    taskDefinition
+      .addContainer("NginxSidecar", {
+        cpu: 256,
+        memoryLimitMiB: 256,
+        image: ecs.ContainerImage.fromAsset(
+          path.resolve(process.cwd(), "../configs/nginx")
+        ),
+        containerName: "nginx",
+        logging: new ecs.AwsLogDriver({
+          streamPrefix: "nginx-sidecar",
+        }),
+      })
+      .addPortMappings({
+        containerPort: 80,
+        hostPort: 80,
+        protocol: ecs.Protocol.TCP,
+      });
 
     const mqttBroker = new ecs.FargateService(this, "MQTTBrokerService", {
       cluster,
@@ -219,7 +225,7 @@ export class SunriseLampStack extends cdk.Stack {
     });
 
     // Create an Application Load Balancer
-    const mqttLoadBalancer = new elbv2.NetworkLoadBalancer(
+    const mqttLoadBalancer = new elbv2.ApplicationLoadBalancer(
       this,
       "MQTTLoadBalancer",
       {
@@ -231,16 +237,18 @@ export class SunriseLampStack extends cdk.Stack {
     // Add a listener to the Application Load Balancer
     const mqttListener = mqttLoadBalancer.addListener("MQTTListener", {
       port: 1883,
-      protocol: elbv2.Protocol.TCP,
+      protocol: elbv2.ApplicationProtocol.HTTP,
     });
 
     // Add the MQTT broker as a target for the listener
     mqttListener.addTargets("MQTTBrokerTarget", {
       port: 1883,
+      protocol: elbv2.ApplicationProtocol.HTTP,
       targets: [mqttBroker],
       healthCheck: {
-        port: "8080",
-        protocol: elbv2.Protocol.TCP,
+        path: "/",
+        protocol: elbv2.Protocol.HTTP,
+        port: "80",
       },
     });
 
@@ -252,7 +260,7 @@ export class SunriseLampStack extends cdk.Stack {
     });
 
     const coreEnv = {
-      BUCKET: configBucket.bucketName,
+      DEVICE_MAPPING_TABLE: deviceMappingTable.tableName,
       SERVER: `mqtt://${mqttLoadBalancer.loadBalancerDnsName}:1883`,
       CREDS: mqttCreds.secretArn,
     };
@@ -262,7 +270,7 @@ export class SunriseLampStack extends cdk.Stack {
     );
 
     // We call this function several times as scheduled by the schedule lambda.
-    const controlFunction = new lambda.Function(this, "ControlLambda", {
+    const controlLambda = new lambda.Function(this, "ControlLambda", {
       runtime: lambda.Runtime.GO_1_X,
       handler: "control",
       code: lambdasPath,
@@ -273,30 +281,23 @@ export class SunriseLampStack extends cdk.Stack {
       },
     });
 
-    // Grant required permissions to Lambda functions
-    configBucket.grantReadWrite(controlFunction);
-
     const mqttCredentials = secretsmanager.Secret.fromSecretNameV2(
       this,
       "MQTTCredentials",
       "mqtt-credentials"
     );
 
-    mqttCredentials.grantRead(controlFunction);
+    mqttCredentials.grantRead(controlLambda);
 
     // Create the Lambda function
-    const createMappingLambda = new lambda.Function(
-      this,
-      "CreateMapping",
-      {
-        runtime: lambda.Runtime.GO_1_X,
-        handler: "create_mapping", 
-        code: lambda.Code.fromAsset("../bin"),
-        environment: {
-          DEVICE_MAPPING_TABLE: deviceMappingTable.tableName,
-        },
-      }
-    );
+    const createMappingLambda = new lambda.Function(this, "CreateMapping", {
+      runtime: lambda.Runtime.GO_1_X,
+      handler: "create_mapping",
+      code: lambda.Code.fromAsset("../bin"),
+      environment: {
+        DEVICE_MAPPING_TABLE: coreEnv.DEVICE_MAPPING_TABLE,
+      },
+    });
 
     // Grant write permissions to the Lambda function
     const writeTablePolicy = new iam.PolicyStatement({
@@ -306,5 +307,13 @@ export class SunriseLampStack extends cdk.Stack {
     });
 
     createMappingLambda.addToRolePolicy(writeTablePolicy);
+
+    const readTablePolicy = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ["dynamodb:GetItem"],
+      resources: [deviceMappingTable.tableArn],
+    });
+
+    controlLambda.addToRolePolicy(readTablePolicy);
   }
 }

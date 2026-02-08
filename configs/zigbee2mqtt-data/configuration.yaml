@@ -1,20 +1,20 @@
-permit_join: true
+version: 5
 mqtt:
   base_topic: zigbee2mqtt
   server: mqtt://localhost:1883
+  user: root
+  password: pass
 serial:
-  port: /dev/ttyUSB0
-frontend:
-  port: 8080
+  port: tcp://host.docker.internal:8888
 advanced:
-  log_level: debug
-  network: GENERATE
-  homeassistant_legacy_entity_attributes: false
-  legacy_api: false
-  legacy_availability_payload: false
-  reporting: true
-device_options:
-  legacy: false
-devices:
-  '0xf0d1b80000180b67':
-    friendly_name: a19
+  log_level: info
+  channel: 11
+  network_key: GENERATE
+  pan_id: GENERATE
+  ext_pan_id: GENERATE
+frontend:
+  enabled: false
+  port: 8080
+homeassistant:
+  enabled: false
+onboarding: true

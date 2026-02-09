@@ -1,0 +1,384 @@
+basePath: /api/v1
+definitions:
+  github_com_urmzd_homai_pkg_api_types.DeviceResponse:
+    properties:
+      device:
+        $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.DeviceWithState'
+    type: object
+  github_com_urmzd_homai_pkg_api_types.DeviceWithState:
+    properties:
+      friendly_name:
+        type: string
+      ieee_address:
+        type: string
+      model:
+        type: string
+      state:
+        additionalProperties: {}
+        type: object
+      state_schema:
+        items:
+          type: integer
+        type: array
+      type:
+        type: string
+      vendor:
+        type: string
+    type: object
+  github_com_urmzd_homai_pkg_api_types.ErrorResponse:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  github_com_urmzd_homai_pkg_api_types.HealthResponse:
+    properties:
+      controller:
+        type: string
+      status:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  github_com_urmzd_homai_pkg_api_types.ListDevicesResponse:
+    properties:
+      count:
+        type: integer
+      devices:
+        items:
+          $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.DeviceWithState'
+        type: array
+    type: object
+  github_com_urmzd_homai_pkg_api_types.RenameDeviceRequest:
+    properties:
+      friendly_name:
+        type: string
+    required:
+    - friendly_name
+    type: object
+  github_com_urmzd_homai_pkg_api_types.StartDiscoveryRequest:
+    properties:
+      duration_seconds:
+        type: integer
+    type: object
+  github_com_urmzd_homai_pkg_api_types.StartDiscoveryResponse:
+    properties:
+      duration_seconds:
+        type: integer
+      expires_at:
+        type: string
+      status:
+        type: string
+    type: object
+  github_com_urmzd_homai_pkg_api_types.StateResponse:
+    properties:
+      device:
+        type: string
+      state:
+        additionalProperties: {}
+        type: object
+      timestamp:
+        type: string
+    type: object
+  github_com_urmzd_homai_pkg_api_types.StopDiscoveryResponse:
+    properties:
+      status:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: REST API for controlling smart home devices
+  title: Homai API
+  version: "1.0"
+paths:
+  /devices:
+    get:
+      description: Returns a list of all paired devices (excluding coordinator)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ListDevicesResponse'
+        "500":
+          description: Controller error
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "504":
+          description: Request timed out
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+      summary: List all devices
+      tags:
+      - devices
+  /devices/{id}:
+    delete:
+      description: Removes a device from the network
+      parameters:
+      - description: Device IEEE address or friendly name
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Force removal even if device is offline
+        in: query
+        name: force
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Device removed successfully
+        "404":
+          description: Device not found
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "500":
+          description: Controller error
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "504":
+          description: Request timed out
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+      summary: Remove a device
+      tags:
+      - devices
+    get:
+      description: Returns details for a specific device by IEEE address or friendly
+        name
+      parameters:
+      - description: Device IEEE address or friendly name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.DeviceResponse'
+        "404":
+          description: Device not found
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "500":
+          description: Controller error
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "504":
+          description: Request timed out
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+      summary: Get device details
+      tags:
+      - devices
+    patch:
+      consumes:
+      - application/json
+      description: Changes the friendly name of a device
+      parameters:
+      - description: Device IEEE address or friendly name
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: New friendly name
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.RenameDeviceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.DeviceResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "404":
+          description: Device not found
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "500":
+          description: Controller error
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "504":
+          description: Request timed out
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+      summary: Rename a device
+      tags:
+      - devices
+  /devices/{id}/state:
+    get:
+      description: Returns the current state of a device
+      parameters:
+      - description: Device IEEE address or friendly name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.StateResponse'
+        "404":
+          description: Device not found
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "500":
+          description: Device error
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "504":
+          description: Request timed out
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+      summary: Get device state
+      tags:
+      - devices
+    post:
+      consumes:
+      - application/json
+      description: Sets the state of a device using a free-form JSON object validated
+        against the device's schema
+      parameters:
+      - description: Device IEEE address or friendly name
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: State to set
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.StateResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "404":
+          description: Device not found
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "500":
+          description: Device error
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "504":
+          description: Request timed out
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+      summary: Set device state
+      tags:
+      - devices
+  /discovery/events:
+    get:
+      description: Server-Sent Events stream for real-time device join/leave notifications
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: SSE event stream
+          schema:
+            type: string
+      summary: Subscribe to discovery events
+      tags:
+      - discovery
+  /discovery/start:
+    post:
+      consumes:
+      - application/json
+      description: Enables pairing mode to allow new devices to join
+      parameters:
+      - description: Discovery duration (default 120 seconds, max 600)
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.StartDiscoveryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.StartDiscoveryResponse'
+        "400":
+          description: Invalid duration
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "500":
+          description: Controller error
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "504":
+          description: Request timed out
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+      summary: Start device discovery
+      tags:
+      - discovery
+  /discovery/stop:
+    post:
+      description: Disables pairing mode
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.StopDiscoveryResponse'
+        "500":
+          description: Controller error
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+        "504":
+          description: Request timed out
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+      summary: Stop device discovery
+      tags:
+      - discovery
+  /health:
+    get:
+      description: Returns the health status of the API and controller
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Service is healthy
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.HealthResponse'
+        "503":
+          description: Service is degraded
+          schema:
+            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.HealthResponse'
+      summary: Health check
+      tags:
+      - health
+schemes:
+- http
+- https
+swagger: "2.0"

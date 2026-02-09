@@ -2,3 +2,4 @@
 mosquitto/mosquitto-data
 mosquitto/mosquitto-logs
 bin
+tmp

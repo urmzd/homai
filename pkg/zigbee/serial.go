@@ -30,7 +30,10 @@ func OpenSerial(portPath string) (*SerialPort, error) {
 	}
 
 	// Silicon Labs EZSP dongles require RTS/CTS hardware flow control.
-	port.SetRTS(true)
+	if err := port.SetRTS(true); err != nil {
+		_ = port.Close()
+		return nil, fmt.Errorf("set RTS: %w", err)
+	}
 
 	log.Info().Str("port", portPath).Msg("Serial port opened")
 

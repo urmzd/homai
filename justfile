@@ -1,5 +1,5 @@
 # Default recipe
-default: build
+default: check
 
 # Build all binaries
 build:
@@ -13,10 +13,23 @@ build:
 
 # Clean build artifacts
 clean:
-    rm -rf bin
+    rm -rf bin/
+
+# Run tests
+test:
+    go test ./...
+
+# Lint: format check, golangci-lint, go vet
+lint:
+    gofmt -l .
+    golangci-lint run ./...
+    go vet ./...
+
+# Quality gate: lint + test
+check: lint test
 
 # Generate swagger documentation
-generate-swagger:
+swagger:
     swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
 
 # Build and run API with live reload
@@ -37,9 +50,3 @@ open-db:
 # Reset database (delete file)
 reset-db:
     rm -f ~/.config/homai/homai.db
-
-# Lint: format check, golangci-lint, go vet
-lint:
-    gofmt -l .
-    golangci-lint run ./...
-    go vet ./...

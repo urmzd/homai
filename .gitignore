@@ -1,5 +1,11 @@
 **/log/**/*
 mosquitto/mosquitto-data
 mosquitto/mosquitto-logs
-bin
+bin/
 tmp
+.claude/
+.vscode/
+.env
+.env.*
+.DS_Store
+.idea/

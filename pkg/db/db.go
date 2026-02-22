@@ -54,7 +54,7 @@ func Open(path string) (*DB, error) {
 
 	// Test connection
 	if err := sqlDB.Ping(); err != nil {
-		sqlDB.Close()
+		_ = sqlDB.Close()
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 

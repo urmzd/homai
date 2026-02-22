@@ -67,7 +67,7 @@ func NewController(portPath string) (*Controller, error) {
 	// Connect ASH layer
 	log.Info().Msg("Connecting ASH layer")
 	if err := ash.Connect(); err != nil {
-		s.Close()
+		_ = s.Close()
 		return nil, fmt.Errorf("ASH connect: %w", err)
 	}
 
@@ -519,7 +519,9 @@ func (c *Controller) Close() {
 
 	c.ezsp.Close()
 	c.ash.Close()
-	c.serial.Close()
+	if err := c.serial.Close(); err != nil {
+		log.Warn().Err(err).Msg("Failed to close serial port")
+	}
 
 	log.Info().Msg("Zigbee controller closed")
 }

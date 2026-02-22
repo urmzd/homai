@@ -1,0 +1,18 @@
+branches: [main]
+tag_prefix: "v"
+commit_pattern: '^(?P<type>\w+)(?:\((?P<scope>[^)]+)\))?(?P<breaking>!)?:\s+(?P<description>.+)'
+changelog:
+  file: CHANGELOG.md
+floating_tags: true
+types:
+  - { type: feat, bump: minor }
+  - { type: fix, bump: patch }
+  - { type: perf, bump: patch }
+  - { type: docs }
+  - { type: refactor }
+  - { type: revert }
+  - { type: chore }
+  - { type: ci }
+  - { type: test }
+  - { type: build }
+  - { type: style }

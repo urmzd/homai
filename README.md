@@ -4,17 +4,16 @@ Pronounced "homie" - a local-first, privacy-focused smart home control system. M
 
 ## Features
 
-- Local Zigbee device control via Zigbee2MQTT
+- Direct Zigbee device control via EZSP serial protocol (no Zigbee2MQTT/MQTT required)
 - REST API for device management
 - Real-time device events via Server-Sent Events (SSE)
 - Multi-profile support for multiple installations
-- Encrypted credential storage
+- MCP server for AI assistant integration
 - Swagger API documentation
 
 ## Prerequisites
 
 - Go 1.24+
-- Docker & Docker Compose
 - Zigbee 3.0 USB adapter (e.g., SONOFF Zigbee 3.0 USB Dongle Plus)
 - [just](https://github.com/casey/just) command runner
 
@@ -26,23 +25,29 @@ Pronounced "homie" - a local-first, privacy-focused smart home control system. M
    cd homai
    ```
 
-2. Set environment variables:
+2. Build the binaries:
    ```bash
-   export MQTT_USER=your_username
-   export MQTT_PASSWORD=your_password
+   just build
    ```
 
-3. Start the services:
+3. Run the API server:
    ```bash
-   just up
+   ./bin/api --port /dev/cu.SLAB_USBtoUART
    ```
 
-4. In a new terminal, run the API:
+4. (Optional) Run the MCP server:
    ```bash
-   just api
+   ./bin/mcp
    ```
 
 5. Access the API at http://localhost:8080
+
+## Binaries
+
+| Binary | Description |
+|--------|-------------|
+| `bin/api` | REST API server for device management and Zigbee control |
+| `bin/mcp` | MCP server for AI assistant integration (stdio transport) |
 
 ## API Endpoints
 
@@ -51,11 +56,6 @@ Pronounced "homie" - a local-first, privacy-focused smart home control system. M
 |--------|----------|-------------|
 | GET | `/health` | Health check |
 | GET | `/api/v1/health` | Health check (versioned) |
-
-### Bridge
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/bridge/status` | Get Zigbee2MQTT bridge status |
 
 ### Devices
 | Method | Endpoint | Description |
@@ -85,16 +85,6 @@ Pronounced "homie" - a local-first, privacy-focused smart home control system. M
 
 ## Configuration
 
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `MQTT_USER` | MQTT broker username | `root` |
-| `MQTT_PASSWORD` | MQTT broker password | `pass` |
-| `ZIGBEE_DEVICE_PATH` | Path to Zigbee USB adapter | `/dev/ttyUSB0` |
-| `TZ` | Timezone | `America/Toronto` |
-| `CREDENTIALS_PASSPHRASE` | Encryption key for stored credentials | - |
-
 ### Database
 
 Configuration is stored in SQLite at `~/.config/homai/homai.db`
@@ -103,33 +93,29 @@ Configuration is stored in SQLite at `~/.config/homai/homai.db`
 
 | Command | Description |
 |---------|-------------|
-| `just api` | Run the API server |
-| `just up` | Start Docker services (foreground) |
-| `just up-detached` | Start Docker services (background) |
-| `just down` | Stop and remove Docker services |
+| `just build` | Build all binaries to `bin/` |
+| `just clean` | Remove `dist/` directory |
+| `just test` | Run all tests |
+| `just lint` | Run gofmt, golangci-lint, go vet |
+| `just check` | Run lint + test (default) |
 | `just swagger` | Generate Swagger documentation |
-| `just devices` | List all paired Zigbee devices |
-| `just permit-join` | Enable device pairing (default: 120s) |
-| `just permit-join-off` | Disable device pairing |
-| `just discover` | Discover nearby Zigbee devices |
-| `just db` | Open database in sqlite3 |
-| `just db-reset` | Delete the database |
-| `just build` | Build all binaries |
-| `just clean` | Remove built binaries |
+| `just run` | Run API server with live reload (air) |
+| `just open-db` | Open database in sqlite3 |
+| `just reset-db` | Delete the database |
 
 ## Architecture
 
 ```
-┌─────────────┐     ┌──────┐     ┌─────────────┐     ┌────────────────┐
-│  API Server │────▶│ MQTT │────▶│ Zigbee2MQTT │────▶│ Zigbee Devices │
-│   (Go/Gin)  │◀────│      │◀────│             │◀────│                │
-└─────────────┘     └──────┘     └─────────────┘     └────────────────┘
+┌─────────────┐     ┌──────────────┐     ┌────────────────┐
+│  API Server │────▶│  EZSP Layer  │────▶│ Zigbee Devices │
+│   (Go/Gin)  │◀────│  (Serial)    │◀────│                │
+└─────────────┘     └──────────────┘     └────────────────┘
        │
        ▼
-┌─────────────┐
-│   SQLite    │
-│  (Config)   │
-└─────────────┘
+┌─────────────┐     ┌─────────────┐
+│   SQLite    │     │  MCP Server │
+│  (Config)   │     │  (stdio)    │
+└─────────────┘     └─────────────┘
 ```
 
 ## Tested Hardware

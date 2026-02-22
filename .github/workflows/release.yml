@@ -1,0 +1,17 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    uses: urmzd/semantic-release/.github/workflows/release.yml@v1
+    with:
+      config-file: .urmzd.sr.yml
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}

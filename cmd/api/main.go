@@ -43,7 +43,11 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to open database")
 	}
-	defer database.Close()
+	defer func() {
+		if err := database.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to close database")
+		}
+	}()
 
 	log.Info().Str("path", database.Path()).Msg("Database opened")
 
@@ -103,7 +107,9 @@ func main() {
 		<-sigChan
 
 		log.Info().Msg("Shutting down...")
-		database.Close()
+		if err := database.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to close database")
+		}
 		os.Exit(0)
 	}()
 

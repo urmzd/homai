@@ -147,10 +147,12 @@ func (h *DiscoveryHandler) Events(c *gin.Context) {
 	defer h.subscriber.Unsubscribe(eventChan)
 
 	// Send initial connection event
-	sendSSEEvent(c.Writer, "connected", map[string]any{
+	if err := sendSSEEvent(c.Writer, "connected", map[string]any{
 		"timestamp": time.Now(),
 		"message":   "Connected to discovery event stream",
-	})
+	}); err != nil {
+		return
+	}
 	c.Writer.Flush()
 
 	// Get client gone channel
@@ -169,25 +171,32 @@ func (h *DiscoveryHandler) Events(c *gin.Context) {
 			if !ok {
 				return
 			}
-			sendSSEEvent(c.Writer, event.Type, map[string]any{
+			if err := sendSSEEvent(c.Writer, event.Type, map[string]any{
 				"type":      event.Type,
 				"device":    event.Device,
 				"timestamp": event.Timestamp,
-			})
+			}); err != nil {
+				return
+			}
 			c.Writer.Flush()
 
 		case <-ticker.C:
-			sendSSEEvent(c.Writer, "heartbeat", map[string]any{
+			if err := sendSSEEvent(c.Writer, "heartbeat", map[string]any{
 				"timestamp": time.Now(),
-			})
+			}); err != nil {
+				return
+			}
 			c.Writer.Flush()
 		}
 	}
 }
 
 // sendSSEEvent writes an SSE event to the response
-func sendSSEEvent(w io.Writer, eventType string, data any) {
+func sendSSEEvent(w io.Writer, eventType string, data any) error {
 	jsonData, _ := json.Marshal(data)
-	io.WriteString(w, "event: "+eventType+"\n")
-	io.WriteString(w, "data: "+string(jsonData)+"\n\n")
+	if _, err := io.WriteString(w, "event: "+eventType+"\n"); err != nil {
+		return err
+	}
+	_, err := io.WriteString(w, "data: "+string(jsonData)+"\n\n")
+	return err
 }

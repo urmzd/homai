@@ -10,8 +10,26 @@ jobs:
 
   release:
     needs: ci
-    uses: urmzd/semantic-release/.github/workflows/release.yml@v1
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: urmzd/semantic-release@v1
+        id: sr
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    outputs:
+      released: ${{ steps.sr.outputs.released }}
+      tag: ${{ steps.sr.outputs.tag }}
+
+  build:
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    uses: ./.github/workflows/build.yml
     with:
-      config-file: .urmzd.sr.yml
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
+      tag: ${{ needs.release.outputs.tag }}

@@ -45,8 +45,8 @@ start-api:
 
 # Open database in sqlite3
 open-db:
-    sqlite3 ~/.config/homai/homai.db
+    sqlite3 ~/.config/zigbee-rest/zigbee-rest.db
 
 # Reset database (delete file)
 reset-db:
-    rm -f ~/.config/homai/homai.db
+    rm -f ~/.config/zigbee-rest/zigbee-rest.db

@@ -29,19 +29,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ListDevicesResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ListDevicesResponse"
                         }
                     },
                     "500": {
                         "description": "Controller error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "504": {
                         "description": "Request timed out",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     }
                 }
@@ -70,25 +70,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.DeviceResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.DeviceResponse"
                         }
                     },
                     "404": {
                         "description": "Device not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Controller error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "504": {
                         "description": "Request timed out",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     }
                 }
@@ -124,19 +124,19 @@ const docTemplate = `{
                     "404": {
                         "description": "Device not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Controller error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "504": {
                         "description": "Request timed out",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     }
                 }
@@ -167,7 +167,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.RenameDeviceRequest"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.RenameDeviceRequest"
                         }
                     }
                 ],
@@ -175,31 +175,31 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.DeviceResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.DeviceResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Device not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Controller error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "504": {
                         "description": "Request timed out",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     }
                 }
@@ -228,25 +228,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.StateResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.StateResponse"
                         }
                     },
                     "404": {
                         "description": "Device not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Device error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "504": {
                         "description": "Request timed out",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     }
                 }
@@ -285,31 +285,31 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.StateResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.StateResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Device not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Device error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "504": {
                         "description": "Request timed out",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     }
                 }
@@ -354,7 +354,7 @@ const docTemplate = `{
                         "name": "request",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.StartDiscoveryRequest"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.StartDiscoveryRequest"
                         }
                     }
                 ],
@@ -362,25 +362,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.StartDiscoveryResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.StartDiscoveryResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid duration",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Controller error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "504": {
                         "description": "Request timed out",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     }
                 }
@@ -400,19 +400,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.StopDiscoveryResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.StopDiscoveryResponse"
                         }
                     },
                     "500": {
                         "description": "Controller error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     },
                     "504": {
                         "description": "Request timed out",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse"
                         }
                     }
                 }
@@ -432,13 +432,13 @@ const docTemplate = `{
                     "200": {
                         "description": "Service is healthy",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.HealthResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.HealthResponse"
                         }
                     },
                     "503": {
                         "description": "Service is degraded",
                         "schema": {
-                            "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.HealthResponse"
+                            "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.HealthResponse"
                         }
                     }
                 }
@@ -446,15 +446,15 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "github_com_urmzd_homai_pkg_api_types.DeviceResponse": {
+        "github_com_urmzd_zigbee_rest_pkg_api_types.DeviceResponse": {
             "type": "object",
             "properties": {
                 "device": {
-                    "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.DeviceWithState"
+                    "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.DeviceWithState"
                 }
             }
         },
-        "github_com_urmzd_homai_pkg_api_types.DeviceWithState": {
+        "github_com_urmzd_zigbee_rest_pkg_api_types.DeviceWithState": {
             "type": "object",
             "properties": {
                 "friendly_name": {
@@ -484,7 +484,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_urmzd_homai_pkg_api_types.ErrorResponse": {
+        "github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse": {
             "type": "object",
             "properties": {
                 "error": {
@@ -495,7 +495,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_urmzd_homai_pkg_api_types.HealthResponse": {
+        "github_com_urmzd_zigbee_rest_pkg_api_types.HealthResponse": {
             "type": "object",
             "properties": {
                 "controller": {
@@ -509,7 +509,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_urmzd_homai_pkg_api_types.ListDevicesResponse": {
+        "github_com_urmzd_zigbee_rest_pkg_api_types.ListDevicesResponse": {
             "type": "object",
             "properties": {
                 "count": {
@@ -518,12 +518,12 @@ const docTemplate = `{
                 "devices": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_urmzd_homai_pkg_api_types.DeviceWithState"
+                        "$ref": "#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.DeviceWithState"
                     }
                 }
             }
         },
-        "github_com_urmzd_homai_pkg_api_types.RenameDeviceRequest": {
+        "github_com_urmzd_zigbee_rest_pkg_api_types.RenameDeviceRequest": {
             "type": "object",
             "required": [
                 "friendly_name"
@@ -534,7 +534,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_urmzd_homai_pkg_api_types.StartDiscoveryRequest": {
+        "github_com_urmzd_zigbee_rest_pkg_api_types.StartDiscoveryRequest": {
             "type": "object",
             "properties": {
                 "duration_seconds": {
@@ -542,7 +542,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_urmzd_homai_pkg_api_types.StartDiscoveryResponse": {
+        "github_com_urmzd_zigbee_rest_pkg_api_types.StartDiscoveryResponse": {
             "type": "object",
             "properties": {
                 "duration_seconds": {
@@ -556,7 +556,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_urmzd_homai_pkg_api_types.StateResponse": {
+        "github_com_urmzd_zigbee_rest_pkg_api_types.StateResponse": {
             "type": "object",
             "properties": {
                 "device": {
@@ -571,7 +571,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_urmzd_homai_pkg_api_types.StopDiscoveryResponse": {
+        "github_com_urmzd_zigbee_rest_pkg_api_types.StopDiscoveryResponse": {
             "type": "object",
             "properties": {
                 "status": {
@@ -588,7 +588,7 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "localhost:8080",
 	BasePath:         "/api/v1",
 	Schemes:          []string{"http", "https"},
-	Title:            "Homai API",
+	Title:            "Zigbee REST API",
 	Description:      "REST API for controlling smart home devices",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,

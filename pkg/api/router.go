@@ -4,9 +4,9 @@ import (
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	"github.com/urmzd/homai/pkg/api/handlers"
-	"github.com/urmzd/homai/pkg/device"
-	"github.com/urmzd/homai/pkg/device/schema"
+	"github.com/urmzd/zigbee-rest/pkg/api/handlers"
+	"github.com/urmzd/zigbee-rest/pkg/device"
+	"github.com/urmzd/zigbee-rest/pkg/device/schema"
 )
 
 // Router holds the Gin engine and dependencies

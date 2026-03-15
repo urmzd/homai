@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/urmzd/homai/pkg/api/types"
-	"github.com/urmzd/homai/pkg/device"
-	"github.com/urmzd/homai/pkg/device/schema"
+	"github.com/urmzd/zigbee-rest/pkg/api/types"
+	"github.com/urmzd/zigbee-rest/pkg/device"
+	"github.com/urmzd/zigbee-rest/pkg/device/schema"
 )
 
 // ControlHandler handles device state control endpoints

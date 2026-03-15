@@ -1,11 +1,11 @@
 basePath: /api/v1
 definitions:
-  github_com_urmzd_homai_pkg_api_types.DeviceResponse:
+  github_com_urmzd_zigbee_rest_pkg_api_types.DeviceResponse:
     properties:
       device:
-        $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.DeviceWithState'
+        $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.DeviceWithState'
     type: object
-  github_com_urmzd_homai_pkg_api_types.DeviceWithState:
+  github_com_urmzd_zigbee_rest_pkg_api_types.DeviceWithState:
     properties:
       friendly_name:
         type: string
@@ -25,14 +25,14 @@ definitions:
       vendor:
         type: string
     type: object
-  github_com_urmzd_homai_pkg_api_types.ErrorResponse:
+  github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse:
     properties:
       error:
         type: string
       message:
         type: string
     type: object
-  github_com_urmzd_homai_pkg_api_types.HealthResponse:
+  github_com_urmzd_zigbee_rest_pkg_api_types.HealthResponse:
     properties:
       controller:
         type: string
@@ -41,28 +41,28 @@ definitions:
       timestamp:
         type: string
     type: object
-  github_com_urmzd_homai_pkg_api_types.ListDevicesResponse:
+  github_com_urmzd_zigbee_rest_pkg_api_types.ListDevicesResponse:
     properties:
       count:
         type: integer
       devices:
         items:
-          $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.DeviceWithState'
+          $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.DeviceWithState'
         type: array
     type: object
-  github_com_urmzd_homai_pkg_api_types.RenameDeviceRequest:
+  github_com_urmzd_zigbee_rest_pkg_api_types.RenameDeviceRequest:
     properties:
       friendly_name:
         type: string
     required:
     - friendly_name
     type: object
-  github_com_urmzd_homai_pkg_api_types.StartDiscoveryRequest:
+  github_com_urmzd_zigbee_rest_pkg_api_types.StartDiscoveryRequest:
     properties:
       duration_seconds:
         type: integer
     type: object
-  github_com_urmzd_homai_pkg_api_types.StartDiscoveryResponse:
+  github_com_urmzd_zigbee_rest_pkg_api_types.StartDiscoveryResponse:
     properties:
       duration_seconds:
         type: integer
@@ -71,7 +71,7 @@ definitions:
       status:
         type: string
     type: object
-  github_com_urmzd_homai_pkg_api_types.StateResponse:
+  github_com_urmzd_zigbee_rest_pkg_api_types.StateResponse:
     properties:
       device:
         type: string
@@ -81,7 +81,7 @@ definitions:
       timestamp:
         type: string
     type: object
-  github_com_urmzd_homai_pkg_api_types.StopDiscoveryResponse:
+  github_com_urmzd_zigbee_rest_pkg_api_types.StopDiscoveryResponse:
     properties:
       status:
         type: string
@@ -90,7 +90,7 @@ host: localhost:8080
 info:
   contact: {}
   description: REST API for controlling smart home devices
-  title: Homai API
+  title: Zigbee REST API
   version: "1.0"
 paths:
   /devices:
@@ -102,15 +102,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ListDevicesResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ListDevicesResponse'
         "500":
           description: Controller error
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "504":
           description: Request timed out
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
       summary: List all devices
       tags:
       - devices
@@ -135,15 +135,15 @@ paths:
         "404":
           description: Device not found
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "500":
           description: Controller error
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "504":
           description: Request timed out
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
       summary: Remove a device
       tags:
       - devices
@@ -162,19 +162,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.DeviceResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.DeviceResponse'
         "404":
           description: Device not found
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "500":
           description: Controller error
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "504":
           description: Request timed out
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
       summary: Get device details
       tags:
       - devices
@@ -193,30 +193,30 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.RenameDeviceRequest'
+          $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.RenameDeviceRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.DeviceResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.DeviceResponse'
         "400":
           description: Invalid request
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "404":
           description: Device not found
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "500":
           description: Controller error
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "504":
           description: Request timed out
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
       summary: Rename a device
       tags:
       - devices
@@ -235,19 +235,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.StateResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.StateResponse'
         "404":
           description: Device not found
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "500":
           description: Device error
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "504":
           description: Request timed out
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
       summary: Get device state
       tags:
       - devices
@@ -274,23 +274,23 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.StateResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.StateResponse'
         "400":
           description: Invalid request
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "404":
           description: Device not found
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "500":
           description: Device error
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "504":
           description: Request timed out
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
       summary: Set device state
       tags:
       - devices
@@ -317,26 +317,26 @@ paths:
         in: body
         name: request
         schema:
-          $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.StartDiscoveryRequest'
+          $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.StartDiscoveryRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.StartDiscoveryResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.StartDiscoveryResponse'
         "400":
           description: Invalid duration
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "500":
           description: Controller error
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "504":
           description: Request timed out
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
       summary: Start device discovery
       tags:
       - discovery
@@ -349,15 +349,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.StopDiscoveryResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.StopDiscoveryResponse'
         "500":
           description: Controller error
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
         "504":
           description: Request timed out
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.ErrorResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.ErrorResponse'
       summary: Stop device discovery
       tags:
       - discovery
@@ -370,11 +370,11 @@ paths:
         "200":
           description: Service is healthy
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.HealthResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.HealthResponse'
         "503":
           description: Service is degraded
           schema:
-            $ref: '#/definitions/github_com_urmzd_homai_pkg_api_types.HealthResponse'
+            $ref: '#/definitions/github_com_urmzd_zigbee_rest_pkg_api_types.HealthResponse'
       summary: Health check
       tags:
       - health

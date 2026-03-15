@@ -128,5 +128,5 @@ func defaultDBPath() (string, error) {
 		baseDir = filepath.Join(home, ".config")
 	}
 
-	return filepath.Join(baseDir, "homai", "homai.db"), nil
+	return filepath.Join(baseDir, "zigbee-rest", "zigbee-rest.db"), nil
 }

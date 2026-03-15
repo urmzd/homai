@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/urmzd/homai/pkg/api/types"
-	"github.com/urmzd/homai/pkg/device"
+	"github.com/urmzd/zigbee-rest/pkg/api/types"
+	"github.com/urmzd/zigbee-rest/pkg/device"
 )
 
 // DevicesHandler handles device CRUD endpoints

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/urmzd/homai/pkg/device"
+	"github.com/urmzd/zigbee-rest/pkg/device"
 )
 
 // KnownDevice tracks a Zigbee device discovered on the network.

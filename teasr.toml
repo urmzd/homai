@@ -1,0 +1,18 @@
+[output]
+dir = "./showcase"
+formats = ["png"]
+
+[[scenes]]
+type = "terminal"
+command = "go run ./cmd/cli/main.go --help"
+name = "cli-help"
+theme = "dracula"
+cols = 100
+
+[[scenes]]
+type = "terminal"
+command = "go run ./cmd/cli/main.go health 2>&1"
+name = "cli-json-output"
+theme = "dracula"
+cols = 100
+maxLines = 30

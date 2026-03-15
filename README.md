@@ -1,6 +1,19 @@
-# Zigbee REST
+<p align="center">
+  <h1 align="center">homai</h1>
+  <p align="center">
+    A local-first, privacy-focused smart home control system. Manage your Zigbee devices through a REST API and CLI without cloud dependencies.
+    <br /><br />
+    <a href="https://github.com/urmzd/homai/releases">Download</a>
+    &middot;
+    <a href="https://github.com/urmzd/homai/issues">Report Bug</a>
+    &middot;
+    <a href="https://github.com/urmzd/homai/blob/main/AGENTS.md">API Docs</a>
+  </p>
+</p>
 
-A local-first, privacy-focused smart home control system. Manage your Zigbee devices through a REST API and CLI without cloud dependencies.
+<p align="center">
+  <a href="https://github.com/urmzd/homai/actions/workflows/ci.yml"><img src="https://github.com/urmzd/homai/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
 
 ## Features
 
@@ -126,6 +139,12 @@ Configuration is stored in SQLite at `~/.config/zigbee-rest/zigbee-rest.db`.
 │   SQLite    │     │     CLI     │
 │  (Config)   │     │  (HTTP→API) │
 └─────────────┘     └─────────────┘
+```
+
+## Agent Skill
+
+```bash
+npx skills add urmzd/homai
 ```
 
 ## Tested Hardware

@@ -9,8 +9,8 @@
 ## Getting Started
 
 ```bash
-git clone https://github.com/urmzd/homai.git
-cd homai
+git clone https://github.com/urmzd/zigbee-rest.git
+cd zigbee-rest
 just init
 ```
 

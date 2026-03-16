@@ -1,18 +1,18 @@
 <p align="center">
-  <h1 align="center">homai</h1>
+  <h1 align="center">zigbee-rest</h1>
   <p align="center">
     A local-first, privacy-focused smart home control system. Manage your Zigbee devices through a REST API and CLI without cloud dependencies.
     <br /><br />
-    <a href="https://github.com/urmzd/homai/releases">Download</a>
+    <a href="https://github.com/urmzd/zigbee-rest/releases">Download</a>
     &middot;
-    <a href="https://github.com/urmzd/homai/issues">Report Bug</a>
+    <a href="https://github.com/urmzd/zigbee-rest/issues">Report Bug</a>
     &middot;
-    <a href="https://github.com/urmzd/homai/blob/main/AGENTS.md">API Docs</a>
+    <a href="https://github.com/urmzd/zigbee-rest/blob/main/AGENTS.md">API Docs</a>
   </p>
 </p>
 
 <p align="center">
-  <a href="https://github.com/urmzd/homai/actions/workflows/ci.yml"><img src="https://github.com/urmzd/homai/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/urmzd/zigbee-rest/actions/workflows/ci.yml"><img src="https://github.com/urmzd/zigbee-rest/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
 ## Features
@@ -144,7 +144,7 @@ Configuration is stored in SQLite at `~/.config/zigbee-rest/zigbee-rest.db`.
 ## Agent Skill
 
 ```bash
-npx skills add urmzd/homai
+npx skills add urmzd/zigbee-rest
 ```
 
 ## Tested Hardware

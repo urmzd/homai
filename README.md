@@ -15,6 +15,18 @@
   <a href="https://github.com/urmzd/zigbee-rest/actions/workflows/ci.yml"><img src="https://github.com/urmzd/zigbee-rest/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
+## Showcase
+
+<p align="center">
+  <strong>CLI Help</strong><br>
+  <img src="showcase/cli-help.png" alt="zigbee-rest CLI help" width="600">
+</p>
+
+<p align="center">
+  <strong>JSON Output</strong><br>
+  <img src="showcase/cli-json-output.png" alt="zigbee-rest JSON output" width="600">
+</p>
+
 ## Features
 
 - Direct Zigbee device control via EZSP serial protocol (no Zigbee2MQTT or MQTT broker required)

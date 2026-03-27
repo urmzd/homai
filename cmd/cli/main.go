@@ -12,8 +12,13 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urmzd/zigbee-skill/pkg/app"
+	"github.com/urmzd/zigbee-skill/pkg/daemon"
 	"github.com/urmzd/zigbee-skill/pkg/device"
+	"github.com/urmzd/zigbee-skill/pkg/device/schema"
 )
+
+// Set via -ldflags at build time.
+var version = "dev"
 
 func main() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
@@ -28,6 +33,8 @@ func main() {
 
 	// Extract global flags
 	var configPath, serialPort string
+	var socketPath, pidPath, logPath string
+	var daemonForeground bool
 	var filtered []string
 	for i := 0; i < len(args); i++ {
 		switch {
@@ -41,25 +48,84 @@ func main() {
 			i++
 		case strings.HasPrefix(args[i], "--port="):
 			serialPort = args[i][len("--port="):]
+		case args[i] == "--socket" && i+1 < len(args):
+			socketPath = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--socket="):
+			socketPath = args[i][len("--socket="):]
+		case args[i] == "--pid" && i+1 < len(args):
+			pidPath = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--pid="):
+			pidPath = args[i][len("--pid="):]
+		case args[i] == "--log" && i+1 < len(args):
+			logPath = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--log="):
+			logPath = args[i][len("--log="):]
+		case args[i] == "--daemon-foreground":
+			daemonForeground = true
 		default:
 			filtered = append(filtered, args[i])
 		}
 	}
 	args = filtered
 
+	if socketPath == "" {
+		socketPath = daemon.DefaultSocketPath
+	}
+	if pidPath == "" {
+		pidPath = daemon.DefaultPIDPath
+	}
+	if logPath == "" {
+		logPath = daemon.DefaultLogPath
+	}
+
+	// Internal: run as foreground daemon (called by Fork).
+	if daemonForeground {
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+		log.Info().Str("version", version).Msg("Starting zigbee-skill daemon")
+		srv := daemon.NewServer(socketPath, pidPath)
+		if err := srv.Start(configPath, serialPort); err != nil {
+			fatal("daemon: %s", err)
+		}
+		return
+	}
+
 	if len(args) == 0 {
 		usage()
 		os.Exit(1)
 	}
 
+	// Handle daemon subcommand before initializing the app.
+	if args[0] == "daemon" {
+		if err := cmdDaemon(args[1:], socketPath, pidPath, logPath, configPath, serialPort); err != nil {
+			fatal("%s", err)
+		}
+		return
+	}
+
 	ctx := context.Background()
 
-	a, err := app.New(ctx, configPath, serialPort)
-	if err != nil {
-		fatal("failed to initialize: %s", err)
+	// Auto-detect running daemon and route through it.
+	var a *app.App
+	if running, _, _ := daemon.IsRunning(pidPath); running {
+		client := daemon.NewClient(socketPath)
+		a = &app.App{
+			Controller: client,
+			Events:     daemon.NewDaemonEventSubscriber(socketPath),
+			Validator:  schema.NewValidator(),
+		}
+	} else {
+		var err error
+		a, err = app.New(ctx, configPath, serialPort)
+		if err != nil {
+			fatal("failed to initialize: %s", err)
+		}
+		defer a.Close()
 	}
-	defer a.Close()
 
+	var err error
 	switch args[0] {
 	case "health":
 		err = cmdHealth(a)
@@ -94,7 +160,7 @@ func cmdHealth(a *app.App) error {
 
 func cmdDevices(ctx context.Context, a *app.App, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("devices requires a subcommand: list, get, rename, remove, state, set")
+		return fmt.Errorf("devices requires a subcommand: list, get, rename, remove, clear, state, set")
 	}
 
 	switch args[0] {
@@ -189,6 +255,12 @@ func cmdDevices(ctx context.Context, a *app.App, args []string) error {
 		}
 		return output(map[string]any{"device": id, "state": st, "timestamp": time.Now().UTC().Format(time.RFC3339)})
 
+	case "clear":
+		if err := a.Controller.ClearDevices(ctx); err != nil {
+			return fmt.Errorf("clear devices: %w", err)
+		}
+		return output(map[string]any{"success": true, "message": "all devices removed"})
+
 	default:
 		return fmt.Errorf("unknown devices subcommand: %s", args[0])
 	}
@@ -239,8 +311,8 @@ func cmdDiscovery(ctx context.Context, a *app.App, args []string) error {
 						fmt.Fprintf(os.Stderr, "Device joined: %s (%s)\n", ev.Device.ID, ev.Device.Name)
 						if waitFor > 0 && len(seen) >= waitFor {
 							fmt.Fprintf(os.Stderr, "Reached --wait-for %d. Finishing discovery.\n", waitFor)
-							// Give cluster discovery time to complete
-							time.Sleep(5 * time.Second)
+							// Give key exchange and cluster discovery time to complete
+							time.Sleep(20 * time.Second)
 							_ = a.Controller.PermitJoin(ctx, false, 0)
 							goto done
 						}
@@ -276,6 +348,62 @@ func cmdDiscovery(ctx context.Context, a *app.App, args []string) error {
 
 	default:
 		return fmt.Errorf("unknown discovery subcommand: %s", args[0])
+	}
+}
+
+func cmdDaemon(args []string, socketPath, pidPath, logPath, configPath, serialPort string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("daemon requires a subcommand: start, stop, status")
+	}
+
+	switch args[0] {
+	case "start":
+		if running, pid, _ := daemon.IsRunning(pidPath); running {
+			return output(map[string]any{"status": "already running", "pid": pid})
+		}
+		// Build args for the forked daemon process.
+		forkArgs := []string{"--daemon-foreground"}
+		if configPath != "" {
+			forkArgs = append(forkArgs, "--config", configPath)
+		}
+		if serialPort != "" {
+			forkArgs = append(forkArgs, "--port", serialPort)
+		}
+		forkArgs = append(forkArgs, "--socket", socketPath, "--pid", pidPath, "--log", logPath)
+
+		if err := daemon.Fork(logPath, forkArgs); err != nil {
+			return fmt.Errorf("start daemon: %w", err)
+		}
+		// Wait for socket to appear (up to 5 seconds).
+		for range 50 {
+			if _, err := os.Stat(socketPath); err == nil {
+				return output(map[string]any{
+					"status":  "started",
+					"version": version,
+					"socket":  socketPath,
+					"pid":     pidPath,
+					"log":     logPath,
+				})
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		return fmt.Errorf("daemon did not start (check %s for details)", logPath)
+
+	case "stop":
+		if err := daemon.StopDaemon(pidPath); err != nil {
+			return fmt.Errorf("stop daemon: %w", err)
+		}
+		return output(map[string]any{"status": "stopped"})
+
+	case "status":
+		running, pid, _ := daemon.IsRunning(pidPath)
+		if running {
+			return output(map[string]any{"status": "running", "version": version, "pid": pid, "socket": socketPath})
+		}
+		return output(map[string]any{"status": "stopped"})
+
+	default:
+		return fmt.Errorf("unknown daemon subcommand: %s (use start, stop, status)", args[0])
 	}
 }
 
@@ -387,10 +515,14 @@ func usage() {
 
 Commands:
   health                              Check controller health
+  daemon start                        Start background daemon (keeps Zigbee connection alive)
+  daemon stop                         Stop the daemon
+  daemon status                       Check if daemon is running
   devices list                        List all paired devices
   devices get <id>                    Get device details
   devices rename <id> --name <name>   Rename a device
   devices remove <id> [--force]       Remove a device
+  devices clear                       Remove all devices
   devices state <id>                  Get device state
   devices set <id> --state ON         Set device state
   discovery start [--duration 120] [--wait-for 1]  Start pairing mode
@@ -399,12 +531,18 @@ Commands:
 Global flags:
   --config <path>   Config file path (default: ./zigbee-skill.yaml)
   --port <path>     Zigbee serial port (overrides config file)
+  --socket <path>   Daemon Unix socket (default: /tmp/zigbee-skill.sock)
+  --pid <path>      Daemon PID file (default: /tmp/zigbee-skill.pid)
+  --log <path>      Daemon log file (default: /tmp/zigbee-skill.log)
 
+When the daemon is running, all commands route through it automatically.
 All output is JSON. Pipe to jq for filtering.
 
 Examples:
+  zigbee-skill daemon start --port /dev/ttyUSB0
+  zigbee-skill daemon status
   zigbee-skill devices list | jq '.devices[].friendly_name'
   zigbee-skill devices set bedroom-lamp --state ON --brightness 150
-  zigbee-skill devices state bedroom-lamp | jq '.state'
+  zigbee-skill daemon stop
 `)
 }

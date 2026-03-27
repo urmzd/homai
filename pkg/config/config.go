@@ -33,6 +33,8 @@ type DeviceEntry struct {
 	Type         string    `yaml:"type"`
 	Manufacturer string    `yaml:"manufacturer,omitempty"`
 	Model        string    `yaml:"model,omitempty"`
+	Endpoint     uint8     `yaml:"endpoint,omitempty"`
+	Clusters     []uint16  `yaml:"clusters,omitempty"`
 	LastSeen     time.Time `yaml:"last_seen,omitempty"`
 }
 

@@ -41,9 +41,9 @@ const (
 
 // ZCL global commands
 const (
-	zclGlobalReadAttributes          uint8 = 0x00
-	zclGlobalReadAttributesResponse  uint8 = 0x01
-	zclGlobalConfigureReporting      uint8 = 0x06
+	zclGlobalReadAttributes         uint8 = 0x00
+	zclGlobalReadAttributesResponse uint8 = 0x01
+	zclGlobalConfigureReporting     uint8 = 0x06
 )
 
 // ZCL direction

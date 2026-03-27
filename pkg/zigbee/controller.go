@@ -101,10 +101,24 @@ func (c *Controller) initStack() error {
 	}
 	log.Info().Uint8("protocol", proto).Uint16("stack", stackVer).Msg("EZSP version OK")
 
+	// Issue 2: Validate stack version is R23+ (EmberZNet 7.x+, BDB 6.4)
+	if stackVer < 0x0700 {
+		log.Warn().Uint16("stackVersion", stackVer).
+			Msg("Stack version < 7.0 (R23); some BDB 3.1 features may not be available")
+	}
+
 	// Configure stack
 	log.Info().Msg("Configuring EZSP stack")
 	if err := c.ezsp.ConfigureStack(); err != nil {
 		return err
+	}
+
+	// Issue 7: Set Trust Center policies (BDB 5.6.1)
+	if err := c.ezsp.SetPolicy(ezspPolicyTrustCenterPolicy, ezspDecisionAllowJoinsRejoinsHaveKey); err != nil {
+		log.Warn().Err(err).Msg("Failed to set TC policy (non-fatal)")
+	}
+	if err := c.ezsp.SetPolicy(ezspPolicyTCKeyRequestPolicy, 0x01); err != nil {
+		log.Warn().Err(err).Msg("Failed to set TC key request policy (non-fatal)")
 	}
 
 	// Try to resume existing network
@@ -116,13 +130,26 @@ func (c *Controller) initStack() error {
 
 	if status == emberSuccess || status == emberNetworkUp {
 		log.Info().Msg("Resumed existing Zigbee network")
+		// Issue 4: Broadcast Device_annce after network resume (BDB 7.1)
+		if err := c.broadcastDeviceAnnce(); err != nil {
+			log.Warn().Err(err).Msg("Failed to broadcast Device_annce (non-fatal)")
+		}
 		return nil
 	}
 
 	log.Info().Uint8("status", status).Msg("No existing network, forming new one")
 
-	// Form a new network
-	channel := uint8(15)
+	// Issue 1: Energy scan across BDB primary channel set before forming (BDB 8.1)
+	channel, err := c.ezsp.EnergyScan(bdbcTLPrimaryChannelSet, 4)
+	if err != nil {
+		log.Warn().Err(err).Msg("Primary channel scan failed, trying secondary")
+		channel, err = c.ezsp.EnergyScan(bdbcTLSecondaryChannelSet, 4)
+		if err != nil {
+			log.Warn().Err(err).Msg("Secondary scan failed, defaulting to channel 15")
+			channel = 15
+		}
+	}
+
 	panID := uint16(rand.Intn(0xFFFE) + 1)
 	var extPanID [8]byte
 	for i := range extPanID {
@@ -136,7 +163,35 @@ func (c *Controller) initStack() error {
 	// Wait briefly for network to come up
 	time.Sleep(500 * time.Millisecond)
 
+	// Broadcast Device_annce for newly formed network
+	if err := c.broadcastDeviceAnnce(); err != nil {
+		log.Warn().Err(err).Msg("Failed to broadcast Device_annce after formation (non-fatal)")
+	}
+
 	return nil
+}
+
+// broadcastDeviceAnnce sends a ZDO Device_annce broadcast (BDB 7.1 step 4).
+func (c *Controller) broadcastDeviceAnnce() error {
+	eui64, err := c.ezsp.GetEUI64()
+	if err != nil {
+		return fmt.Errorf("get EUI64: %w", err)
+	}
+
+	nodeID, err := c.ezsp.GetNodeID()
+	if err != nil {
+		return fmt.Errorf("get NodeID: %w", err)
+	}
+
+	// ZDO Device_annce payload: NWK addr (2) + IEEE addr (8) + capability (1)
+	payload := make([]byte, 11)
+	binary.LittleEndian.PutUint16(payload[0:2], nodeID)
+	copy(payload[2:10], eui64[:])
+	// Capability: allocate address | RX on when idle | main powered = 0x8C
+	payload[10] = 0x8C
+
+	log.Info().Str("eui64", formatIEEE(eui64)).Uint16("nodeID", nodeID).Msg("Broadcasting Device_annce")
+	return c.ezsp.SendBroadcast(0xFFFD, zdoProfileID, zdoClusterDeviceAnnce, 0, 0, payload, 0)
 }
 
 // handleCallback processes async EZSP callbacks from the NCP.
@@ -206,6 +261,12 @@ func (c *Controller) handleTrustCenterJoin(data []byte) {
 		Device:    &dev,
 		Timestamp: time.Now(),
 	})
+
+	// Issue 8: Configure default attribute reporting on newly joined devices (BDB 6.5)
+	go func() {
+		time.Sleep(2 * time.Second) // brief delay for device to stabilize
+		c.configureDeviceReporting(kd)
+	}()
 }
 
 // handleIncomingMessage processes incoming ZCL messages from devices.
@@ -236,6 +297,17 @@ func (c *Controller) handleIncomingMessage(data []byte) {
 		Uint16("sender", sender).
 		Int("msgLen", int(msgLen)).
 		Msg("Incoming ZCL message")
+
+	// Issue 6: Respond to Keep Alive Read Attributes requests (BDB 7.3.1)
+	if clusterID == zclClusterKeepAlive && len(message) >= 3 {
+		frameControl := message[0]
+		seqNum := message[1]
+		cmdID := message[2]
+		if frameControl&0x01 == 0 && cmdID == zclGlobalReadAttributes {
+			c.handleKeepAliveRequest(sender, seqNum)
+			return
+		}
+	}
 
 	// Try to find device by nodeID and update state
 	c.devicesMu.Lock()
@@ -382,15 +454,26 @@ func (c *Controller) RenameDevice(_ context.Context, id, newName string) error {
 
 func (c *Controller) RemoveDevice(_ context.Context, id string, force bool) error {
 	c.devicesMu.Lock()
-	_, ok := c.devices[id]
+	kd, ok := c.devices[id]
 	if !ok {
 		c.devicesMu.Unlock()
 		return device.ErrNotFound
 	}
+
+	// Issue 10: Send ZDO Mgmt_Leave_req before local removal (BDB 13.4)
+	ieee := kd.IEEEAddress
+	nodeID := kd.NodeID
 	delete(c.devices, id)
 	c.devicesMu.Unlock()
 
-	// TODO: send ZDO Leave request to the device
+	// ZDO Mgmt_Leave_req payload: IEEE address (8) + options (1)
+	payload := make([]byte, 9)
+	copy(payload[0:8], ieee[:])
+	payload[8] = 0x00 // options: no rejoin, no remove children
+	if err := c.ezsp.SendUnicast(nodeID, zdoProfileID, zdoClusterMgmtLeaveReq, 0, 0, payload); err != nil {
+		log.Warn().Err(err).Str("device", id).Msg("Failed to send ZDO Leave request (device removed locally)")
+	}
+
 	return nil
 }
 
@@ -494,16 +577,45 @@ func (c *Controller) SetDeviceState(_ context.Context, id string, state map[stri
 }
 
 func (c *Controller) PermitJoin(_ context.Context, enable bool, duration int) error {
-	var dur uint8
-	if enable {
-		if duration <= 0 || duration > 254 {
-			dur = 254
-		} else {
-			dur = uint8(duration)
-		}
+	if !enable {
+		return c.ezsp.PermitJoining(0)
 	}
 
-	return c.ezsp.PermitJoining(dur)
+	// Issue 3: BDB 9.7 requires permit join >= bdbcMinCommissioningTime (180s)
+	if duration < bdbcMinCommissioningTime {
+		duration = bdbcMinCommissioningTime
+	}
+
+	// EZSP permitJoining accepts uint8 max 254. For durations > 254s,
+	// issue the first chunk and schedule re-issue in the background.
+	chunk := min(duration, 254)
+	if err := c.ezsp.PermitJoining(uint8(chunk)); err != nil {
+		return err
+	}
+
+	remaining := duration - chunk
+	if remaining > 0 {
+		go c.reissuePermitJoin(remaining)
+	}
+	return nil
+}
+
+// reissuePermitJoin extends permit joining in 254s chunks until the total duration is met.
+func (c *Controller) reissuePermitJoin(remaining int) {
+	for remaining > 0 {
+		chunk := min(remaining, 254)
+		// Wait until just before the current permit window expires, then re-issue
+		select {
+		case <-time.After(time.Duration(chunk-4) * time.Second):
+		case <-c.stopChan:
+			return
+		}
+		if err := c.ezsp.PermitJoining(uint8(chunk)); err != nil {
+			log.Warn().Err(err).Msg("Failed to re-issue permitJoining")
+			return
+		}
+		remaining -= chunk
+	}
 }
 
 func (c *Controller) IsConnected() bool {
@@ -562,4 +674,38 @@ func boolToOnOff(b bool) string {
 		return "ON"
 	}
 	return "OFF"
+}
+
+// handleKeepAliveRequest responds to a Keep Alive cluster Read Attributes request (BDB 7.3.1).
+func (c *Controller) handleKeepAliveRequest(sender uint16, seqNum uint8) {
+	// TC Keep-Alive Base (attr 0x0000): 10 minutes, uint16
+	// TC Keep-Alive Jitter (attr 0x0001): 300 seconds, uint16
+	attrs := []ZCLAttrValue{
+		{0x0000, 0x21, []byte{0x0A, 0x00}}, // 10 minutes
+		{0x0001, 0x21, []byte{0x2C, 0x01}}, // 300 seconds
+	}
+
+	respPayload := BuildReadAttributesResponsePayload(attrs)
+	frame := EncodeZCLGlobalResponse(seqNum, zclGlobalReadAttributesResponse, respPayload)
+
+	if err := c.ezsp.SendUnicast(sender, zclProfileHA, zclClusterKeepAlive, 1, 1, frame); err != nil {
+		log.Warn().Err(err).Uint16("sender", sender).Msg("Failed to send Keep Alive response")
+	} else {
+		log.Debug().Uint16("sender", sender).Msg("Sent Keep Alive response")
+	}
+}
+
+// configureDeviceReporting sends default reporting configuration to a newly joined device (BDB 6.5).
+func (c *Controller) configureDeviceReporting(kd *KnownDevice) {
+	// On/Off cluster, attribute 0x0000 (Boolean): min=0, max=3600s, no reportable change for discrete
+	onOffReport := BuildConfigureReportingCommand(zclAttrOnOff, 0x10, 0, 3600, nil)
+	if err := c.ezsp.SendUnicast(kd.NodeID, zclProfileHA, zclClusterOnOff, 1, kd.Endpoint, onOffReport); err != nil {
+		log.Warn().Err(err).Uint16("nodeID", kd.NodeID).Msg("Failed to configure On/Off reporting")
+	}
+
+	// Level Control cluster, attribute 0x0000 (uint8): min=1, max=3600s, reportable change=1
+	levelReport := BuildConfigureReportingCommand(zclAttrCurrentLevel, 0x20, 1, 3600, []byte{0x01})
+	if err := c.ezsp.SendUnicast(kd.NodeID, zclProfileHA, zclClusterLevelControl, 1, kd.Endpoint, levelReport); err != nil {
+		log.Warn().Err(err).Uint16("nodeID", kd.NodeID).Msg("Failed to configure Level reporting")
+	}
 }

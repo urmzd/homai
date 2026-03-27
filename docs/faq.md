@@ -74,14 +74,23 @@ In EZSP v8+ extended frames, `FC_hi` (frame control high byte) must be `0x01` to
 
 ### How does device discovery work?
 
-1. Call `discovery start` (CLI) or `POST /api/v1/discovery/start` (API) to enable permit-join mode on the coordinator
+1. Run `zigbee-skill discovery start` to enable permit-join mode on the coordinator
 2. Put your Zigbee device in pairing mode (usually hold a button for 5+ seconds)
 3. The NCP sends a `trustCenterJoinHandler` callback when a device joins
-4. The controller registers the device and makes it available via the API
+4. The controller registers the device and saves it to `zigbee-skill.yaml`
 
 ### My device joined but shows as "Unknown" model/vendor
 
 Device identification relies on ZCL attribute reads (Basic cluster) which happen after the initial join. If the device hasn't responded to attribute queries yet, it will show as Unknown. The device type may also be incorrectly classified (e.g., a smart plug showing as "light") until proper endpoint/cluster enumeration is implemented.
+
+### What happens to devices on restart?
+
+The coordinator resumes the existing Zigbee network from NCP flash. Previously paired devices are loaded from `zigbee-skill.yaml` and typically rejoin the network within **~30 seconds**. During this window, the device appears in `devices list` but may not respond to commands until it reconnects.
+
+If a device doesn't reconnect after 30 seconds:
+1. Power-cycle the device (unplug and replug)
+2. If that doesn't work, factory reset it (hold the button for 10+ seconds until the LED blinks rapidly)
+3. Re-pair via `zigbee-skill discovery start`
 
 ### The coordinator says "No existing network, forming new one"
 

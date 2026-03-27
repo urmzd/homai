@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Zigbee REST is a local-first smart home controller written in Go. It controls Zigbee devices directly via EZSP serial protocol and exposes a REST API + CLI. No cloud, no MQTT broker.
+Zigbee Skill is an AI-native smart home tool written in Go. It gives AI agents direct control over Zigbee devices via EZSP serial protocol, enabling homes that adapt to user preferences through natural interaction. No cloud, no MQTT broker.
 
 **Key tech:** Go 1.24, Gin, SQLite, EZSP/Zigbee, `just` task runner
 
@@ -23,8 +23,8 @@ go build -o bin/cli ./cmd/cli
 # Start API server (default: 0.0.0.0:8080)
 ./bin/api --port /dev/cu.SLAB_USBtoUART
 
-# Custom database path (default: ~/.config/zigbee-rest/zigbee-rest.db)
-./bin/api --db /path/to/zigbee-rest.db --port /dev/ttyUSB0
+# Custom database path (default: ~/.config/zigbee-skill/zigbee-skill.db)
+./bin/api --db /path/to/zigbee-skill.db --port /dev/ttyUSB0
 ```
 
 The database is auto-created and migrated on first run.
@@ -34,15 +34,15 @@ The database is auto-created and migrated on first run.
 The CLI outputs JSON to stdout and errors to stderr. It talks to the running API server.
 
 ```bash
-zigbee-rest health
-zigbee-rest devices list
-zigbee-rest devices get <id>
-zigbee-rest devices rename <id> --name <name>
-zigbee-rest devices remove <id>
-zigbee-rest devices state <id>
-zigbee-rest devices set <id> --state ON --brightness 150
-zigbee-rest discovery start [--duration 120]
-zigbee-rest discovery stop
+zigbee-skill health
+zigbee-skill devices list
+zigbee-skill devices get <id>
+zigbee-skill devices rename <id> --name <name>
+zigbee-skill devices remove <id>
+zigbee-skill devices state <id>
+zigbee-skill devices set <id> --state ON --brightness 150
+zigbee-skill discovery start [--duration 120]
+zigbee-skill discovery stop
 ```
 
 `<id>` is a device's IEEE address or friendly name.
@@ -53,22 +53,22 @@ Use `--address <url>` to target a different API server (default: `http://localho
 
 ```bash
 # List device names
-zigbee-rest devices list | jq '.devices[].friendly_name'
+zigbee-skill devices list | jq '.devices[].friendly_name'
 
 # Turn on a light
-zigbee-rest devices set bedroom-lamp --state ON
+zigbee-skill devices set bedroom-lamp --state ON
 
 # Set brightness
-zigbee-rest devices set bedroom-lamp --state ON --brightness 150
+zigbee-skill devices set bedroom-lamp --state ON --brightness 150
 
 # Turn off
-zigbee-rest devices set bedroom-lamp --state OFF
+zigbee-skill devices set bedroom-lamp --state OFF
 
 # Get current state
-zigbee-rest devices state bedroom-lamp | jq '.state'
+zigbee-skill devices state bedroom-lamp | jq '.state'
 
 # Pair a new device
-zigbee-rest discovery start --duration 120
+zigbee-skill discovery start --duration 120
 ```
 
 ### Response shapes

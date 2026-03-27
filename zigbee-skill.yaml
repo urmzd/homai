@@ -1,3 +1,10 @@
 serial:
     port: /dev/cu.SLAB_USBtoUART
-devices: []
+devices:
+    - ieee_address: ff:ff:b4:0e:06:07:77:37
+      friendly_name: ff:ff:b4:0e:06:07:77:37
+      type: switch
+      endpoint: 1
+      clusters:
+        - 6
+      last_seen: 2026-03-26T21:26:32.614851-05:00

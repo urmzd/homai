@@ -14,6 +14,7 @@ const configFileName = "zigbee-skill.yaml"
 
 // Config is the top-level configuration persisted to zigbee-skill.yaml.
 type Config struct {
+	Name    string        `yaml:"name,omitempty"`
 	Serial  SerialConfig  `yaml:"serial"`
 	Devices []DeviceEntry `yaml:"devices"`
 

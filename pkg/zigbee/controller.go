@@ -11,16 +11,24 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/urmzd/zigbee-rest/pkg/device"
+	"github.com/urmzd/zigbee-skill/pkg/device"
 )
 
 // KnownDevice tracks a Zigbee device discovered on the network.
 type KnownDevice struct {
-	IEEEAddress [8]byte
-	NodeID      uint16
-	DeviceType  string
-	Endpoint    uint8
-	State       device.DeviceState
+	IEEEAddress  [8]byte
+	NodeID       uint16
+	FriendlyName string
+	DeviceType   string
+	Endpoint     uint8
+	State        device.DeviceState
+}
+
+// LoadEntry is used to pre-populate the device map from persistent config on startup.
+type LoadEntry struct {
+	IEEEAddress  [8]byte
+	FriendlyName string
+	DeviceType   string
 }
 
 // Controller implements device.Controller and device.EventSubscriber
@@ -39,7 +47,35 @@ type Controller struct {
 	connected bool
 	connMu    sync.RWMutex
 
-	stopChan chan struct{}
+	onDeviceChange func() // called after device join/leave/rename
+	stopChan       chan struct{}
+}
+
+// SetOnDeviceChange registers a callback invoked after the device list changes.
+func (c *Controller) SetOnDeviceChange(fn func()) { c.onDeviceChange = fn }
+
+// notifyDeviceChange calls the registered callback if set.
+func (c *Controller) notifyDeviceChange() {
+	if c.onDeviceChange != nil {
+		c.onDeviceChange()
+	}
+}
+
+// LoadDevices pre-populates the in-memory device map from persistent storage.
+// Devices loaded this way have NodeID=0 until they rejoin the network.
+func (c *Controller) LoadDevices(entries []LoadEntry) {
+	c.devicesMu.Lock()
+	defer c.devicesMu.Unlock()
+	for _, e := range entries {
+		ieee := formatIEEE(e.IEEEAddress)
+		c.devices[ieee] = &KnownDevice{
+			IEEEAddress:  e.IEEEAddress,
+			FriendlyName: e.FriendlyName,
+			DeviceType:   e.DeviceType,
+			Endpoint:     1,
+			State:        make(device.DeviceState),
+		}
+	}
 }
 
 // NewController creates and initializes a Zigbee EZSP controller.
@@ -239,21 +275,35 @@ func (c *Controller) handleTrustCenterJoin(data []byte) {
 			Timestamp: time.Now(),
 			Device:    &device.Device{ID: ieeeStr},
 		})
+		c.notifyDeviceChange()
 		return
 	}
 
-	// New device joined
-	kd := &KnownDevice{
-		IEEEAddress: ieee,
-		NodeID:      nodeID,
-		DeviceType:  device.DeviceTypeLight, // default assumption
-		Endpoint:    1,                      // most HA devices use endpoint 1
-		State:       make(device.DeviceState),
+	c.devicesMu.Lock()
+	existing, found := c.devices[ieeeStr]
+	if found {
+		// Device rejoining — update NodeID but preserve friendly name and type.
+		existing.NodeID = nodeID
+		c.devicesMu.Unlock()
+		log.Info().Str("ieee", ieeeStr).Uint16("nodeID", nodeID).Msg("Known device rejoined, updated NodeID")
+	} else {
+		// New device
+		kd := &KnownDevice{
+			IEEEAddress:  ieee,
+			NodeID:       nodeID,
+			FriendlyName: ieeeStr, // default name = IEEE address
+			DeviceType:   device.DeviceTypeLight,
+			Endpoint:     1,
+			State:        make(device.DeviceState),
+		}
+		c.devices[ieeeStr] = kd
+		c.devicesMu.Unlock()
+		c.notifyDeviceChange()
 	}
 
-	c.devicesMu.Lock()
-	c.devices[ieeeStr] = kd
-	c.devicesMu.Unlock()
+	c.devicesMu.RLock()
+	kd := c.devices[ieeeStr]
+	c.devicesMu.RUnlock()
 
 	dev := c.knownToDevice(ieeeStr, kd)
 	c.publishEvent(device.DiscoveryEvent{
@@ -379,10 +429,14 @@ func (c *Controller) publishEvent(evt device.DiscoveryEvent) {
 
 // knownToDevice converts a KnownDevice to a device.Device.
 func (c *Controller) knownToDevice(ieeeStr string, kd *KnownDevice) device.Device {
+	name := kd.FriendlyName
+	if name == "" {
+		name = ieeeStr
+	}
 	stateSchema, _ := json.Marshal(lightStateSchema())
 	return device.Device{
 		ID:           ieeeStr,
-		Name:         ieeeStr,
+		Name:         name,
 		Type:         kd.DeviceType,
 		Protocol:     device.ProtocolZigbee,
 		Manufacturer: "Unknown",
@@ -428,9 +482,9 @@ func (c *Controller) GetDevice(_ context.Context, id string) (*device.Device, er
 
 	kd, ok := c.devices[id]
 	if !ok {
-		// Also search by name
+		// Search by friendly name
 		for ieee, d := range c.devices {
-			if ieee == id {
+			if strings.EqualFold(d.FriendlyName, id) {
 				kd = d
 				ok = true
 				id = ieee
@@ -447,9 +501,27 @@ func (c *Controller) GetDevice(_ context.Context, id string) (*device.Device, er
 }
 
 func (c *Controller) RenameDevice(_ context.Context, id, newName string) error {
-	// Zigbee doesn't have a native rename; we could store names locally.
-	// For now, this is unsupported.
-	return device.ErrUnsupported
+	c.devicesMu.Lock()
+	kd, ok := c.devices[id]
+	if !ok {
+		// Search by friendly name
+		for ieee, d := range c.devices {
+			if strings.EqualFold(d.FriendlyName, id) {
+				kd = d
+				ok = true
+				_ = ieee
+				break
+			}
+		}
+	}
+	if !ok {
+		c.devicesMu.Unlock()
+		return device.ErrNotFound
+	}
+	kd.FriendlyName = newName
+	c.devicesMu.Unlock()
+	c.notifyDeviceChange()
+	return nil
 }
 
 func (c *Controller) RemoveDevice(_ context.Context, id string, force bool) error {
@@ -474,6 +546,7 @@ func (c *Controller) RemoveDevice(_ context.Context, id string, force bool) erro
 		log.Warn().Err(err).Str("device", id).Msg("Failed to send ZDO Leave request (device removed locally)")
 	}
 
+	c.notifyDeviceChange()
 	return nil
 }
 

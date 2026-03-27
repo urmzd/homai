@@ -1,15 +1,10 @@
 # Default recipe
 default: check
 
-# Build all binaries
+# Build the zigbee-skill binary
 build:
-    #!/usr/bin/env bash
-    for main_file in $(find cmd -type f -name main.go 2>/dev/null); do
-        bin_name=$(dirname "$main_file" | sed 's|cmd/|bin/|')
-        echo "Building $bin_name"
-        mkdir -p "$(dirname "$bin_name")"
-        go build -o "$bin_name" "$main_file"
-    done
+    mkdir -p bin
+    go build -o bin/zigbee-skill ./cmd/cli
 
 # Clean build artifacts
 clean:
@@ -27,26 +22,3 @@ lint:
 
 # Quality gate: lint + test
 check: lint test
-
-# Generate swagger documentation
-swagger:
-    swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
-
-# Build and run API with live reload
-run:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    echo "Starting API server with live reload..."
-    air
-
-# Start the API server only
-start-api:
-    air
-
-# Open database in sqlite3
-open-db:
-    sqlite3 ~/.config/zigbee-rest/zigbee-rest.db
-
-# Reset database (delete file)
-reset-db:
-    rm -f ~/.config/zigbee-rest/zigbee-rest.db

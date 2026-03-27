@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
 	"time"
 
@@ -206,10 +207,66 @@ func cmdDiscovery(ctx context.Context, a *app.App, args []string) error {
 				return fmt.Errorf("invalid duration: %s", d)
 			}
 		}
+		waitFor := 0
+		if w := flagValue(args[1:], "--wait-for"); w != "" {
+			if _, err := fmt.Sscanf(w, "%d", &waitFor); err != nil {
+				return fmt.Errorf("invalid wait-for: %s", w)
+			}
+		}
 		if err := a.Controller.PermitJoin(ctx, true, duration); err != nil {
 			return fmt.Errorf("start discovery: %w", err)
 		}
-		return output(map[string]any{"success": true, "message": fmt.Sprintf("pairing mode enabled for %d seconds", duration), "duration_seconds": duration})
+		fmt.Fprintf(os.Stderr, "Pairing mode enabled for %d seconds. Waiting for devices...\n", duration)
+
+		// Subscribe to discovery events and block until timeout or Ctrl+C.
+		ch := a.Events.Subscribe()
+		defer a.Events.Unsubscribe(ch)
+
+		timer := time.NewTimer(time.Duration(duration) * time.Second)
+		defer timer.Stop()
+
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, os.Interrupt)
+		defer signal.Stop(sigCh)
+
+		seen := map[string]bool{}
+		for {
+			select {
+			case ev := <-ch:
+				if ev.Type == "device_joined" && ev.Device != nil {
+					if !seen[ev.Device.ID] {
+						seen[ev.Device.ID] = true
+						fmt.Fprintf(os.Stderr, "Device joined: %s (%s)\n", ev.Device.ID, ev.Device.Name)
+						if waitFor > 0 && len(seen) >= waitFor {
+							fmt.Fprintf(os.Stderr, "Reached --wait-for %d. Finishing discovery.\n", waitFor)
+							// Give cluster discovery time to complete
+							time.Sleep(5 * time.Second)
+							_ = a.Controller.PermitJoin(ctx, false, 0)
+							goto done
+						}
+					}
+				} else if ev.Type == "device_left" && ev.Device != nil {
+					fmt.Fprintf(os.Stderr, "Device left: %s\n", ev.Device.ID)
+				}
+			case <-timer.C:
+				fmt.Fprintf(os.Stderr, "Discovery finished. %d device(s) joined.\n", len(seen))
+				goto done
+			case <-sigCh:
+				fmt.Fprintf(os.Stderr, "\nDiscovery interrupted. %d device(s) joined.\n", len(seen))
+				_ = a.Controller.PermitJoin(ctx, false, 0)
+				goto done
+			}
+		}
+	done:
+		devices, err := a.Controller.ListDevices(ctx)
+		if err != nil {
+			return err
+		}
+		states := make([]map[string]any, 0, len(devices))
+		for i := range devices {
+			states = append(states, deviceJSON(&devices[i]))
+		}
+		return output(map[string]any{"devices": states, "count": len(states), "new_devices": len(seen)})
 
 	case "stop":
 		if err := a.Controller.PermitJoin(ctx, false, 0); err != nil {
@@ -336,8 +393,8 @@ Commands:
   devices remove <id> [--force]       Remove a device
   devices state <id>                  Get device state
   devices set <id> --state ON         Set device state
-  discovery start [--duration 120]    Start pairing mode
-  discovery stop                      Stop pairing mode
+  discovery start [--duration 120] [--wait-for 1]  Start pairing mode
+  discovery stop                                   Stop pairing mode
 
 Global flags:
   --config <path>   Config file path (default: ./zigbee-skill.yaml)

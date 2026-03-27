@@ -13,30 +13,30 @@ import (
 
 // EZSP frame IDs
 const (
-	ezspVersion               uint16 = 0x0000
-	ezspAddEndpoint           uint16 = 0x0002
-	ezspSetConfigurationValue uint16 = 0x0053
-	ezspGetNetworkParameters  uint16 = 0x0028
-	ezspNetworkInit           uint16 = 0x0017
-	ezspStartScan             uint16 = 0x001A
-	ezspLeaveNetwork          uint16 = 0x0020
-	ezspFormNetwork           uint16 = 0x001E
-	ezspPermitJoining         uint16 = 0x0022
-	ezspSendUnicast           uint16 = 0x0034
-	ezspSendBroadcast         uint16 = 0x0036
-	ezspGetEUI64              uint16 = 0x0026
+	ezspVersion                 uint16 = 0x0000
+	ezspAddEndpoint             uint16 = 0x0002
+	ezspSetConfigurationValue   uint16 = 0x0053
+	ezspGetNetworkParameters    uint16 = 0x0028
+	ezspNetworkInit             uint16 = 0x0017
+	ezspStartScan               uint16 = 0x001A
+	ezspLeaveNetwork            uint16 = 0x0020
+	ezspFormNetwork             uint16 = 0x001E
+	ezspPermitJoining           uint16 = 0x0022
+	ezspSendUnicast             uint16 = 0x0034
+	ezspSendBroadcast           uint16 = 0x0036
+	ezspGetEUI64                uint16 = 0x0026
 	ezspSetPolicy               uint16 = 0x0055
 	ezspSetInitialSecurityState uint16 = 0x0068
 	ezspImportTransientKey      uint16 = 0x0111
-	ezspGetNodeID             uint16 = 0x0027
+	ezspGetNodeID               uint16 = 0x0027
 
 	// Callbacks
-	ezspTrustCenterJoinHandler     uint16 = 0x0024
-	ezspIncomingMessageHandler     uint16 = 0x0045
-	ezspMessageSentHandler         uint16 = 0x003F
-	ezspStackStatusHandler         uint16 = 0x0019
-	ezspScanCompleteHandler        uint16 = 0x001C
-	ezspEnergyScanResultHandler    uint16 = 0x0048
+	ezspTrustCenterJoinHandler  uint16 = 0x0024
+	ezspIncomingMessageHandler  uint16 = 0x0045
+	ezspMessageSentHandler      uint16 = 0x003F
+	ezspStackStatusHandler      uint16 = 0x0019
+	ezspScanCompleteHandler     uint16 = 0x001C
+	ezspEnergyScanResultHandler uint16 = 0x0048
 
 	// EZSP config IDs
 	ezspConfigStackProfile                uint8 = 0x0C
@@ -101,7 +101,7 @@ const (
 	zdoClusterSimpleDescriptorReq  uint16 = 0x0004
 	zdoClusterSimpleDescriptorResp uint16 = 0x8004
 	zdoClusterDeviceAnnce          uint16 = 0x0013
-	zdoClusterMgmtLeaveReq        uint16 = 0x0034
+	zdoClusterMgmtLeaveReq         uint16 = 0x0034
 
 	// BDB constants
 	bdbcMinCommissioningTime = 180 // seconds
@@ -675,7 +675,7 @@ func (e *EZSPLayer) SendUnicast(nodeID uint16, profileID, clusterID uint16, srcE
 	apsFrame = append(apsFrame, dstEndpoint)                         // destinationEndpoint
 	options := uint16(emberApsOptionRetry | emberApsOptionEnableRouteDiscovery)
 	apsFrame = append(apsFrame, byte(options), byte(options>>8)) // options
-	apsFrame = append(apsFrame, 0x00, 0x00) // groupId
+	apsFrame = append(apsFrame, 0x00, 0x00)                      // groupId
 	// APS frame counter is managed by the NCP stack (BDB 6.2 / R23.2 §2.2.7).
 	// No host-side tracking is needed.
 	apsFrame = append(apsFrame, 0x00) // sequence (filled by stack)

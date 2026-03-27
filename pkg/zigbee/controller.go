@@ -564,7 +564,7 @@ func buildStateSchema(clusters []uint16) map[string]any {
 	}
 	if has(zclClusterThermostat) {
 		props["heating_setpoint"] = map[string]any{
-			"type": "number",
+			"type":        "number",
 			"description": "heating setpoint in °C",
 		}
 	}

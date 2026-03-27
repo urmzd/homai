@@ -157,6 +157,14 @@ Configuration is stored in SQLite at `~/.config/zigbee-rest/zigbee-rest.db`.
 
 This repo's conventions are available as portable agent skills in [`skills/`](skills/).
 
+## Specifications
+
+This project implements the Zigbee PRO stack. The relevant specs are available (free, registration required) from the [CSA specifications page](https://csa-iot.org/developer-resource/specifications-download-request/):
+
+- **Zigbee Specification R23.2** — Core protocol: network layer, APS, ZDO, security
+- **PRO Base Device Behavior v3.1** — Zigbee 3.0 commissioning, trust center, network steering
+- **Zigbee Cluster Library R8** — ZCL cluster/command definitions (On/Off, Level Control, etc.)
+
 ## Tested Hardware
 
 - SONOFF Zigbee 3.0 USB Dongle Plus

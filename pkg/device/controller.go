@@ -18,6 +18,9 @@ type Controller interface {
 	// RemoveDevice removes a device from the network
 	RemoveDevice(ctx context.Context, id string, force bool) error
 
+	// ClearDevices removes all devices from the network
+	ClearDevices(ctx context.Context) error
+
 	// GetDeviceState retrieves the current state of a device
 	GetDeviceState(ctx context.Context, id string) (DeviceState, error)
 

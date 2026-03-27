@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -13,16 +14,20 @@ import (
 // EZSP frame IDs
 const (
 	ezspVersion               uint16 = 0x0000
+	ezspAddEndpoint           uint16 = 0x0002
 	ezspSetConfigurationValue uint16 = 0x0053
 	ezspGetNetworkParameters  uint16 = 0x0028
 	ezspNetworkInit           uint16 = 0x0017
 	ezspStartScan             uint16 = 0x001A
+	ezspLeaveNetwork          uint16 = 0x0020
 	ezspFormNetwork           uint16 = 0x001E
 	ezspPermitJoining         uint16 = 0x0022
 	ezspSendUnicast           uint16 = 0x0034
 	ezspSendBroadcast         uint16 = 0x0036
 	ezspGetEUI64              uint16 = 0x0026
-	ezspSetPolicy             uint16 = 0x0055
+	ezspSetPolicy               uint16 = 0x0055
+	ezspSetInitialSecurityState uint16 = 0x0068
+	ezspImportTransientKey      uint16 = 0x0111
 	ezspGetNodeID             uint16 = 0x0027
 
 	// Callbacks
@@ -59,6 +64,9 @@ const (
 	emberJoinedNetwork  = 0x02 //nolint:unused
 
 	// Send options
+	// EMBER_APS_OPTION_ENCRYPTION enables APS-layer encryption using the
+	// Trust Center link key, required for security-compliant devices.
+	emberApsOptionEncryption = 0x0020
 	// EMBER_APS_OPTION_RETRY enables APS-layer retries with acknowledgement,
 	// satisfying BDB 6.10 requirement for APS Acknowledgement usage.
 	emberApsOptionRetry                = 0x0040
@@ -69,9 +77,15 @@ const (
 	ezspPolicyTCKeyRequestPolicy  uint8 = 0x05
 	ezspPolicyAppKeyRequestPolicy uint8 = 0x06 //nolint:unused
 
-	// EZSP policy decisions
-	ezspDecisionAllowJoinsRejoinsHaveKey uint8 = 0x04
-	ezspDecisionAllowKeyRequests         uint8 = 0x01 //nolint:unused
+	// EZSP TC policy decisions (bitmask — from Gecko SDK ezsp-enum.h EzspDecisionBitmask)
+	ezspDecisionAllowJoins             uint8 = 0x01 // EZSP_DECISION_ALLOW_JOINS
+	ezspDecisionAllowUnsecuredRejoins  uint8 = 0x02 // EZSP_DECISION_ALLOW_UNSECURED_REJOINS //nolint:unused
+	ezspDecisionSendKeyInClear         uint8 = 0x04 // EZSP_DECISION_SEND_KEY_IN_CLEAR //nolint:unused
+	ezspDecisionJoinsUseInstallCodeKey uint8 = 0x10 // EZSP_DECISION_JOINS_USE_INSTALL_CODE_KEY //nolint:unused
+	ezspDecisionDeferJoins             uint8 = 0x20 // EZSP_DECISION_DEFER_JOINS //nolint:unused
+
+	// EZSP TC key request policy decisions (from Gecko SDK ezsp-enum.h)
+	ezspAllowTCKeyRequestsAndSendCurrentKey uint8 = 0x51 //nolint:unused
 
 	// BDB channel sets (2.4GHz, bitmask where bit N = channel N)
 	bdbcTLPrimaryChannelSet   uint32 = 0x02108800 // channels 11, 15, 20, 25
@@ -126,6 +140,21 @@ func NewEZSPLayer(ash *ASHLayer) *EZSPLayer {
 // Start begins processing EZSP frames from ASH.
 func (e *EZSPLayer) Start() {
 	go e.readLoop()
+}
+
+// Reinitialize performs ASH reset + EZSP version negotiation + stack configuration.
+// Use after LeaveNetwork to get the NCP into a clean state for FormNetwork.
+func (e *EZSPLayer) Reinitialize() error {
+	if err := e.ash.Reset(); err != nil {
+		return fmt.Errorf("ASH reset: %w", err)
+	}
+	if _, _, _, err := e.NegotiateVersion(); err != nil {
+		return fmt.Errorf("version negotiation: %w", err)
+	}
+	if err := e.ConfigureStack(); err != nil {
+		return fmt.Errorf("configure stack: %w", err)
+	}
+	return nil
 }
 
 // SetCallbackHandler sets the handler for async EZSP callbacks.
@@ -483,6 +512,95 @@ func (e *EZSPLayer) NetworkInit() (uint8, error) {
 	return resp[0], nil
 }
 
+// SetInitialSecurityState configures the NCP's security parameters before
+// forming or joining a network. Must be called before FormNetwork.
+func (e *EZSPLayer) SetInitialSecurityState() error {
+	// EmberInitialSecurityState:
+	//   bitmask (2) + preconfiguredKey (16) + networkKey (16) +
+	//   keySequence (1) + preconfiguredTrustCenterEui64 (8)
+
+	// Bitmask for EZSP v8+ (from Gecko SDK ember-types.h):
+	// HAVE_PRECONFIGURED_KEY (0x0100) | HAVE_NETWORK_KEY (0x0200) |
+	// TRUST_CENTER_GLOBAL_LINK_KEY (0x0004)
+	bitmask := uint16(0x0100 | 0x0200 | 0x0004)
+
+	params := make([]byte, 0, 43)
+	params = append(params, byte(bitmask), byte(bitmask>>8))
+
+	// Preconfigured key = well-known TC link key "ZigBeeAlliance09"
+	wellKnownKey := []byte{0x5A, 0x69, 0x67, 0x42, 0x65, 0x65, 0x41, 0x6C,
+		0x6C, 0x69, 0x61, 0x6E, 0x63, 0x65, 0x30, 0x39}
+	params = append(params, wellKnownKey...)
+
+	// Network key = random (let NCP generate, but we must provide 16 bytes)
+	var nwkKey [16]byte
+	for i := range nwkKey {
+		nwkKey[i] = byte(rand.Intn(256))
+	}
+	params = append(params, nwkKey[:]...)
+
+	params = append(params, 0x00) // keySequence
+
+	// Trust Center EUI64 = all zeros (use local)
+	params = append(params, 0, 0, 0, 0, 0, 0, 0, 0)
+
+	resp, err := e.SendCommand(ezspSetInitialSecurityState, params)
+	if err != nil {
+		return err
+	}
+	if len(resp) < 1 || resp[0] != emberSuccess {
+		status := byte(0xFF)
+		if len(resp) >= 1 {
+			status = resp[0]
+		}
+		return fmt.Errorf("setInitialSecurityState failed: status 0x%02X", status)
+	}
+	return nil
+}
+
+// ImportTransientKey loads a transient link key into the NCP for a joining device.
+// In EZSP v12+, this replaces the deprecated addTransientLinkKey.
+// The NCP uses this key to encrypt the APS Transport Key sent to joining devices.
+// Use eui64 all-zeros as a wildcard to apply to any joining device.
+func (e *EZSPLayer) ImportTransientKey(eui64 [8]byte, key [16]byte) error {
+	// params: eui64(8) + plaintext_key(16) + flags(1)
+	params := make([]byte, 0, 25)
+	params = append(params, eui64[:]...)
+	params = append(params, key[:]...)
+	params = append(params, 0x00) // SecurityManagerContextFlags: NONE
+
+	resp, err := e.SendCommand(ezspImportTransientKey, params)
+	if err != nil {
+		return err
+	}
+	if len(resp) < 1 || resp[0] != emberSuccess {
+		status := byte(0xFF)
+		if len(resp) >= 1 {
+			status = resp[0]
+		}
+		return fmt.Errorf("importTransientKey failed: status 0x%02X", status)
+	}
+	return nil
+}
+
+// LeaveNetwork causes the NCP to leave the current network, clearing its
+// persisted network state. The next NetworkInit will return "not joined",
+// forcing a fresh FormNetwork with current TC policies.
+func (e *EZSPLayer) LeaveNetwork() error {
+	resp, err := e.SendCommand(ezspLeaveNetwork, nil)
+	if err != nil {
+		return err
+	}
+	if len(resp) < 1 || resp[0] != emberSuccess {
+		status := byte(0xFF)
+		if len(resp) >= 1 {
+			status = resp[0]
+		}
+		return fmt.Errorf("leaveNetwork failed: status 0x%02X", status)
+	}
+	return nil
+}
+
 // FormNetwork creates a new Zigbee network.
 func (e *EZSPLayer) FormNetwork(channel uint8, panID uint16, extPanID [8]byte) error {
 	// EmberNetworkParameters struct for formNetwork
@@ -582,6 +700,43 @@ func (e *EZSPLayer) SendUnicast(nodeID uint16, profileID, clusterID uint16, srcE
 			status = resp[0]
 		}
 		return fmt.Errorf("sendUnicast failed: status 0x%02X", status)
+	}
+	return nil
+}
+
+// AddEndpoint registers an application endpoint on the NCP so that it can
+// send and receive ZCL messages on that endpoint. Without this, the NCP
+// silently drops incoming messages addressed to unregistered endpoints.
+func (e *EZSPLayer) AddEndpoint(endpoint uint8, profileID uint16, deviceID uint16, inputClusters, outputClusters []uint16) error {
+	// params: endpoint(1) + profileID(2) + deviceID(2) + appFlags(1) +
+	//         inputClusterCount(1) + outputClusterCount(1) +
+	//         inputClusters(N*2) + outputClusters(N*2)
+	inCount := len(inputClusters)
+	outCount := len(outputClusters)
+	params := make([]byte, 0, 8+inCount*2+outCount*2)
+	params = append(params, endpoint)
+	params = append(params, byte(profileID), byte(profileID>>8))
+	params = append(params, byte(deviceID), byte(deviceID>>8))
+	params = append(params, 0x00)          // appFlags
+	params = append(params, byte(inCount)) // inputClusterCount
+	params = append(params, byte(outCount))
+	for _, c := range inputClusters {
+		params = append(params, byte(c), byte(c>>8))
+	}
+	for _, c := range outputClusters {
+		params = append(params, byte(c), byte(c>>8))
+	}
+
+	resp, err := e.SendCommand(ezspAddEndpoint, params)
+	if err != nil {
+		return err
+	}
+	if len(resp) < 1 || resp[0] != emberSuccess {
+		status := byte(0xFF)
+		if len(resp) >= 1 {
+			status = resp[0]
+		}
+		return fmt.Errorf("addEndpoint failed: status 0x%02X", status)
 	}
 	return nil
 }

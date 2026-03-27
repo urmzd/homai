@@ -23,6 +23,7 @@ type KnownDevice struct {
 	Endpoint     uint8
 	Clusters     []uint16 // input clusters from Simple Descriptor
 	State        device.DeviceState
+	stateUpdate  chan struct{} // signalled when State is updated
 }
 
 // LoadEntry is used to pre-populate the device map from persistent config on startup.
@@ -183,12 +184,20 @@ func (c *Controller) initStack() error {
 		return err
 	}
 
-	// Issue 7: Set Trust Center policies (BDB 5.6.1)
-	if err := c.ezsp.SetPolicy(ezspPolicyTrustCenterPolicy, ezspDecisionAllowJoinsRejoinsHaveKey); err != nil {
+	// Issue 7: Set Trust Center policies (BDB 5.6.1, 5.6.2 backwards compat mode)
+	// Allow joins with well-known TC link key so devices can receive the network key.
+	if err := c.ezsp.SetPolicy(ezspPolicyTrustCenterPolicy, ezspDecisionAllowJoins); err != nil {
 		log.Warn().Err(err).Msg("Failed to set TC policy (non-fatal)")
 	}
 	if err := c.ezsp.SetPolicy(ezspPolicyTCKeyRequestPolicy, 0x01); err != nil {
 		log.Warn().Err(err).Msg("Failed to set TC key request policy (non-fatal)")
+	}
+
+	// Register HA endpoint on the coordinator so the NCP can route
+	// incoming ZCL messages (responses, reports) to the host.
+	haClusters := []uint16{zclClusterOnOff, zclClusterLevelControl}
+	if err := c.ezsp.AddEndpoint(1, zclProfileHA, 0x0005, haClusters, haClusters); err != nil {
+		return fmt.Errorf("register HA endpoint: %w", err)
 	}
 
 	// Try to resume existing network
@@ -200,7 +209,6 @@ func (c *Controller) initStack() error {
 
 	if status == emberSuccess || status == emberNetworkUp {
 		log.Info().Msg("Resumed existing Zigbee network")
-		// Issue 4: Broadcast Device_annce after network resume (BDB 7.1)
 		if err := c.broadcastDeviceAnnce(); err != nil {
 			log.Warn().Err(err).Msg("Failed to broadcast Device_annce (non-fatal)")
 		}
@@ -208,6 +216,11 @@ func (c *Controller) initStack() error {
 	}
 
 	log.Info().Uint8("status", status).Msg("No existing network, forming new one")
+
+	// Set initial security state with well-known TC link key before forming
+	if err := c.ezsp.SetInitialSecurityState(); err != nil {
+		return fmt.Errorf("set initial security state: %w", err)
+	}
 
 	// Issue 1: Energy scan across BDB primary channel set before forming (BDB 8.1)
 	channel, err := c.ezsp.EnergyScan(bdbcTLPrimaryChannelSet, 4)
@@ -428,14 +441,23 @@ func (c *Controller) updateDeviceStateFromZCL(kd *KnownDevice, clusterID uint16,
 
 	if isGlobal && cmdID == zclGlobalReadAttributesResponse {
 		attrs := ParseReadAttributesResponse(payload)
+		updated := false
 		switch clusterID {
 		case zclClusterOnOff:
 			if val, ok := attrs[zclAttrOnOff]; ok && len(val) > 0 {
 				kd.State["state"] = boolToOnOff(val[0] != 0)
+				updated = true
 			}
 		case zclClusterLevelControl:
 			if val, ok := attrs[zclAttrCurrentLevel]; ok && len(val) > 0 {
 				kd.State["brightness"] = int(val[0])
+				updated = true
+			}
+		}
+		if updated && kd.stateUpdate != nil {
+			select {
+			case kd.stateUpdate <- struct{}{}:
+			default:
 			}
 		}
 	}
@@ -586,6 +608,45 @@ func deviceTypeFromClusters(clusters []uint16) string {
 	}
 }
 
+// waitForDevice ensures a device has a valid NodeID (i.e., has rejoined the network).
+// If NodeID is 0 (loaded from config but not yet rejoined), it enables permit-join
+// and waits up to 30 seconds for the device to rejoin.
+func (c *Controller) waitForDevice(kd *KnownDevice, id string) error {
+	if kd.NodeID != 0 {
+		return nil
+	}
+
+	log.Info().Str("device", id).Msg("Device has no NodeID, waiting for rejoin (up to 30s)...")
+	// Enable permit join briefly to allow the device to reconnect
+	_ = c.ezsp.PermitJoining(30)
+
+	for range 60 {
+		time.Sleep(500 * time.Millisecond)
+		c.devicesMu.RLock()
+		nodeID := kd.NodeID
+		c.devicesMu.RUnlock()
+		if nodeID != 0 {
+			log.Info().Str("device", id).Uint16("nodeID", nodeID).Msg("Device rejoined")
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: device %s has not rejoined the network (try power-cycling it)", device.ErrTimeout, id)
+}
+
+// resolveDevice finds a KnownDevice by IEEE address or friendly name.
+// Must be called with devicesMu held (at least RLock).
+func (c *Controller) resolveDevice(id string) (*KnownDevice, bool) {
+	if kd, ok := c.devices[id]; ok {
+		return kd, true
+	}
+	for _, kd := range c.devices {
+		if strings.EqualFold(kd.FriendlyName, id) {
+			return kd, true
+		}
+	}
+	return nil, false
+}
+
 // --- device.Controller interface ---
 
 func (c *Controller) ListDevices(_ context.Context) ([]device.Device, error) {
@@ -649,10 +710,17 @@ func (c *Controller) RenameDevice(_ context.Context, id, newName string) error {
 
 func (c *Controller) RemoveDevice(_ context.Context, id string, force bool) error {
 	c.devicesMu.Lock()
-	kd, ok := c.devices[id]
+	kd, ok := c.resolveDevice(id)
 	if !ok {
 		c.devicesMu.Unlock()
 		return device.ErrNotFound
+	}
+	// Find the actual map key (IEEE address) for deletion
+	for ieee, d := range c.devices {
+		if d == kd {
+			id = ieee
+			break
+		}
 	}
 
 	// Issue 10: Send ZDO Mgmt_Leave_req before local removal (BDB 13.4)
@@ -673,23 +741,71 @@ func (c *Controller) RemoveDevice(_ context.Context, id string, force bool) erro
 	return nil
 }
 
+func (c *Controller) ClearDevices(_ context.Context) error {
+	c.devicesMu.Lock()
+	devices := make(map[string]*KnownDevice, len(c.devices))
+	for k, v := range c.devices {
+		devices[k] = v
+	}
+	c.devices = make(map[string]*KnownDevice)
+	c.devicesMu.Unlock()
+
+	// Send ZDO Leave to each device
+	for ieee, kd := range devices {
+		payload := make([]byte, 9)
+		copy(payload[0:8], kd.IEEEAddress[:])
+		payload[8] = 0x00
+		if err := c.ezsp.SendUnicast(kd.NodeID, zdoProfileID, zdoClusterMgmtLeaveReq, 0, 0, payload); err != nil {
+			log.Warn().Err(err).Str("device", ieee).Msg("Failed to send ZDO Leave request")
+		}
+	}
+
+	c.notifyDeviceChange()
+	return nil
+}
+
 func (c *Controller) GetDeviceState(_ context.Context, id string) (device.DeviceState, error) {
 	c.devicesMu.RLock()
-	kd, ok := c.devices[id]
+	kd, ok := c.resolveDevice(id)
 	c.devicesMu.RUnlock()
 
 	if !ok {
 		return nil, device.ErrNotFound
 	}
 
-	// Send Read Attributes to refresh state
-	readOnOff := BuildReadAttributesCommand(zclAttrOnOff)
-	if err := c.ezsp.SendUnicast(kd.NodeID, zclProfileHA, zclClusterOnOff, 1, kd.Endpoint, readOnOff); err != nil {
-		log.Warn().Err(err).Str("device", id).Msg("Failed to read On/Off state")
+	if err := c.waitForDevice(kd, id); err != nil {
+		return nil, err
 	}
 
-	// Brief wait for response
-	time.Sleep(200 * time.Millisecond)
+	// Set up channel to wait for the state response.
+	ch := make(chan struct{}, 1)
+	c.devicesMu.Lock()
+	kd.stateUpdate = ch
+	c.devicesMu.Unlock()
+	defer func() {
+		c.devicesMu.Lock()
+		kd.stateUpdate = nil
+		c.devicesMu.Unlock()
+	}()
+
+	// Send Read Attributes to refresh state (retry on transient NCP buffer-full errors)
+	readOnOff := BuildReadAttributesCommand(zclAttrOnOff)
+	for attempt := range 3 {
+		err := c.ezsp.SendUnicast(kd.NodeID, zclProfileHA, zclClusterOnOff, 1, kd.Endpoint, readOnOff)
+		if err == nil {
+			break
+		}
+		log.Warn().Err(err).Int("attempt", attempt+1).Str("device", id).Msg("Failed to send ReadAttributes, retrying")
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	// Wait for the response or timeout
+	select {
+	case <-ch:
+		log.Debug().Str("device", id).Msg("Received state update from device")
+	case <-time.After(5 * time.Second):
+		log.Warn().Str("device", id).Msg("Timed out waiting for state response")
+	}
 
 	c.devicesMu.RLock()
 	state := make(device.DeviceState)
@@ -703,11 +819,15 @@ func (c *Controller) GetDeviceState(_ context.Context, id string) (device.Device
 
 func (c *Controller) SetDeviceState(_ context.Context, id string, state map[string]any) (device.DeviceState, error) {
 	c.devicesMu.RLock()
-	kd, ok := c.devices[id]
+	kd, ok := c.resolveDevice(id)
 	c.devicesMu.RUnlock()
 
 	if !ok {
 		return nil, device.ErrNotFound
+	}
+
+	if err := c.waitForDevice(kd, id); err != nil {
+		return nil, err
 	}
 
 	// Handle "state" field (On/Off)
@@ -775,6 +895,17 @@ func (c *Controller) SetDeviceState(_ context.Context, id string, state map[stri
 func (c *Controller) PermitJoin(_ context.Context, enable bool, duration int) error {
 	if !enable {
 		return c.ezsp.PermitJoining(0)
+	}
+
+	// Load the well-known TC link key ("ZigBeeAlliance09") as a transient key
+	// so the NCP can encrypt the APS Transport Key for joining devices.
+	var wildcardEui [8]byte
+	wellKnownKey := [16]byte{
+		0x5A, 0x69, 0x67, 0x42, 0x65, 0x65, 0x41, 0x6C,
+		0x6C, 0x69, 0x61, 0x6E, 0x63, 0x65, 0x30, 0x39,
+	}
+	if err := c.ezsp.ImportTransientKey(wildcardEui, wellKnownKey); err != nil {
+		log.Warn().Err(err).Msg("Failed to import transient link key (join may fail)")
 	}
 
 	// Issue 3: BDB 9.7 requires permit join >= bdbcMinCommissioningTime (180s)

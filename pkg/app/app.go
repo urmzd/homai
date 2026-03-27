@@ -10,7 +10,7 @@ import (
 	"github.com/urmzd/zigbee-skill/pkg/config"
 	"github.com/urmzd/zigbee-skill/pkg/device"
 	"github.com/urmzd/zigbee-skill/pkg/device/schema"
-	"github.com/urmzd/zigbee-skill/pkg/zigbee"
+	zigbee "github.com/urmzd/zigbee-skill/pkg/zigbee"
 )
 
 // App holds the shared core services used by the CLI.
@@ -102,6 +102,8 @@ func configToLoadEntries(cfg *config.Config) []zigbee.LoadEntry {
 			IEEEAddress:  ieee,
 			FriendlyName: d.FriendlyName,
 			DeviceType:   d.Type,
+			Endpoint:     d.Endpoint,
+			Clusters:     d.Clusters,
 		})
 	}
 	return entries
@@ -109,26 +111,23 @@ func configToLoadEntries(cfg *config.Config) []zigbee.LoadEntry {
 
 // syncDevicesToConfig exports the controller's in-memory devices to config.
 func syncDevicesToConfig(zb *zigbee.Controller, cfg *config.Config) {
-	devices, err := zb.ListDevices(context.Background())
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to list devices for config sync")
-		return
-	}
-
-	cfg.Devices = make([]config.DeviceEntry, 0, len(devices))
-	for _, d := range devices {
+	exported := zb.ExportDevices()
+	cfg.Devices = make([]config.DeviceEntry, 0, len(exported))
+	for _, d := range exported {
 		cfg.Devices = append(cfg.Devices, config.DeviceEntry{
-			IEEEAddress:  d.ID,
-			FriendlyName: d.Name,
-			Type:         d.Type,
-			Manufacturer: d.Manufacturer,
-			Model:        d.Model,
+			IEEEAddress:  d.IEEEAddress,
+			FriendlyName: d.FriendlyName,
+			Type:         d.DeviceType,
+			Endpoint:     d.Endpoint,
+			Clusters:     d.Clusters,
 			LastSeen:     time.Now(),
 		})
 	}
 }
 
 // parseIEEE converts a colon-separated IEEE address string to [8]byte.
+// The string is big-endian (MSB first, as formatted by formatIEEE),
+// but the [8]byte is little-endian (LSB at index 0).
 func parseIEEE(s string) ([8]byte, error) {
 	var addr [8]byte
 	clean := strings.ReplaceAll(s, ":", "")
@@ -136,6 +135,9 @@ func parseIEEE(s string) ([8]byte, error) {
 	if err != nil || len(b) != 8 {
 		return addr, err
 	}
-	copy(addr[:], b)
+	// Reverse: big-endian string → little-endian byte array
+	for i := range 8 {
+		addr[i] = b[7-i]
+	}
 	return addr, nil
 }

@@ -12,9 +12,11 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urmzd/zigbee-skill/pkg/app"
+	"github.com/urmzd/zigbee-skill/pkg/config"
 	"github.com/urmzd/zigbee-skill/pkg/daemon"
 	"github.com/urmzd/zigbee-skill/pkg/device"
 	"github.com/urmzd/zigbee-skill/pkg/device/schema"
+	"github.com/urmzd/zigbee-skill/pkg/zigbee"
 )
 
 // Set via -ldflags at build time.
@@ -83,7 +85,7 @@ func main() {
 
 	// Internal: run as foreground daemon (called by Fork).
 	if daemonForeground {
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		log.Info().Str("version", version).Msg("Starting zigbee-skill daemon")
 		srv := daemon.NewServer(socketPath, pidPath)
 		if err := srv.Start(configPath, serialPort); err != nil {
@@ -100,6 +102,14 @@ func main() {
 	// Handle daemon subcommand before initializing the app.
 	if args[0] == "daemon" {
 		if err := cmdDaemon(args[1:], socketPath, pidPath, logPath, configPath, serialPort); err != nil {
+			fatal("%s", err)
+		}
+		return
+	}
+
+	// Handle network subcommand before initializing the app (needs raw serial access).
+	if args[0] == "network" {
+		if err := cmdNetwork(args[1:], configPath, serialPort); err != nil {
 			fatal("%s", err)
 		}
 		return

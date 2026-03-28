@@ -1,5 +1,5 @@
 serial:
-    port: /dev/cu.SLAB_USBtoUART
+    port: /dev/cu.usbserial-2140
 devices:
     - ieee_address: ff:ff:b4:0e:06:07:77:37
       friendly_name: ff:ff:b4:0e:06:07:77:37
@@ -7,4 +7,4 @@ devices:
       endpoint: 1
       clusters:
         - 6
-      last_seen: 2026-03-27T01:39:26.652286-05:00
+      last_seen: 2026-03-28T17:34:00.483585-05:00

@@ -85,7 +85,7 @@ func main() {
 
 	// Internal: run as foreground daemon (called by Fork).
 	if daemonForeground {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 		log.Info().Str("version", version).Msg("Starting zigbee-skill daemon")
 		srv := daemon.NewServer(socketPath, pidPath)
 		if err := srv.Start(configPath, serialPort); err != nil {
@@ -417,6 +417,43 @@ func cmdDaemon(args []string, socketPath, pidPath, logPath, configPath, serialPo
 	}
 }
 
+func cmdNetwork(args []string, configPath, serialPort string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("network requires a subcommand: reset")
+	}
+
+	switch args[0] {
+	case "reset":
+		// Resolve serial port from flag or config.
+		if serialPort == "" {
+			cfg, err := config.Load(configPath)
+			if err == nil {
+				serialPort = cfg.Serial.Port
+			}
+		}
+		if serialPort == "" {
+			return fmt.Errorf("serial port required: use --port or set serial.port in config")
+		}
+
+		c, err := zigbee.NewController(serialPort)
+		if err != nil {
+			return fmt.Errorf("connect to adapter: %w", err)
+		}
+		defer c.Close()
+
+		if err := c.ResetNetwork(); err != nil {
+			return fmt.Errorf("reset network: %w", err)
+		}
+		return output(map[string]any{
+			"success": true,
+			"message": "network cleared — a fresh network will be formed on next startup",
+		})
+
+	default:
+		return fmt.Errorf("unknown network subcommand: %s", args[0])
+	}
+}
+
 // --- helpers ---
 
 func deviceJSON(d *device.Device) map[string]any {
@@ -537,6 +574,7 @@ Commands:
   devices set <id> --state ON         Set device state
   discovery start [--duration 120] [--wait-for 1]  Start pairing mode
   discovery stop                                   Stop pairing mode
+  network reset                                    Clear Zigbee network (forms fresh on next start)
 
 Global flags:
   --config <path>   Config file path (default: ./zigbee-skill.yaml)

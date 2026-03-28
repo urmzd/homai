@@ -45,12 +45,12 @@ func New(_ context.Context, configPath, serialPort string) (*App, error) {
 			controller = device.NewNullController()
 			events = device.NewNullEventSubscriber()
 		} else {
-			// Load persisted devices into the controller
-			entries := configToLoadEntries(cfg)
-			zbController.LoadDevices(entries)
-			if len(entries) > 0 {
-				log.Info().Int("count", len(entries)).Msg("Loaded persisted devices")
-			}
+			// TODO: Re-enable once NodeID persistence is implemented.
+			// Skipping device cache load — persisted devices have NodeID=0
+			// and cannot communicate until they rejoin the network.
+			// entries := configToLoadEntries(cfg)
+			// zbController.LoadDevices(entries)
+			log.Info().Msg("Device cache loading disabled (devices must rejoin via discovery)")
 
 			// Wire persistence: save config when devices change
 			zbController.SetOnDeviceChange(func() {

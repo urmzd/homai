@@ -690,8 +690,19 @@ func (e *EZSPLayer) SendUnicast(nodeID uint16, profileID, clusterID uint16, srcE
 	params = append(params, byte(len(payload))) // messageLength
 	params = append(params, payload...)
 
+	log.Info().
+		Uint16("nodeID", nodeID).
+		Uint16("profileID", profileID).
+		Uint16("clusterID", clusterID).
+		Uint8("srcEP", srcEndpoint).
+		Uint8("dstEP", dstEndpoint).
+		Int("payloadLen", len(payload)).
+		Hex("payload", payload).
+		Msg("EZSP SendUnicast")
+
 	resp, err := e.SendCommand(ezspSendUnicast, params)
 	if err != nil {
+		log.Error().Err(err).Uint16("nodeID", nodeID).Msg("EZSP SendUnicast command failed")
 		return err
 	}
 	if len(resp) < 1 || resp[0] != emberSuccess {
@@ -699,8 +710,10 @@ func (e *EZSPLayer) SendUnicast(nodeID uint16, profileID, clusterID uint16, srcE
 		if len(resp) >= 1 {
 			status = resp[0]
 		}
+		log.Error().Uint8("status", status).Uint16("nodeID", nodeID).Msg("EZSP SendUnicast NCP rejected")
 		return fmt.Errorf("sendUnicast failed: status 0x%02X", status)
 	}
+	log.Info().Uint16("nodeID", nodeID).Msg("EZSP SendUnicast accepted by NCP")
 	return nil
 }
 

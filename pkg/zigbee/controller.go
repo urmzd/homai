@@ -200,6 +200,13 @@ func (c *Controller) initStack() error {
 		return fmt.Errorf("register HA endpoint: %w", err)
 	}
 
+	// Set initial security state BEFORE NetworkInit so the Trust Center
+	// can distribute the network key to joining devices on both fresh
+	// and resumed networks.
+	if err := c.ezsp.SetInitialSecurityState(); err != nil {
+		return fmt.Errorf("set initial security state: %w", err)
+	}
+
 	// Try to resume existing network
 	log.Info().Msg("Initializing Zigbee network")
 	status, err := c.ezsp.NetworkInit()
@@ -216,11 +223,6 @@ func (c *Controller) initStack() error {
 	}
 
 	log.Info().Uint8("status", status).Msg("No existing network, forming new one")
-
-	// Set initial security state with well-known TC link key before forming
-	if err := c.ezsp.SetInitialSecurityState(); err != nil {
-		return fmt.Errorf("set initial security state: %w", err)
-	}
 
 	// Issue 1: Energy scan across BDB primary channel set before forming (BDB 8.1)
 	channel, err := c.ezsp.EnergyScan(bdbcTLPrimaryChannelSet, 4)
@@ -286,8 +288,40 @@ func (c *Controller) handleCallback(frameID uint16, data []byte) {
 		c.handleIncomingMessage(data)
 	case ezspStackStatusHandler:
 		c.handleStackStatus(data)
+	case ezspMessageSentHandler:
+		c.handleMessageSent(data)
 	default:
-		log.Debug().Uint16("frameID", frameID).Msg("Unhandled EZSP callback")
+		log.Info().Uint16("frameID", frameID).Hex("data", data).Msg("Unhandled EZSP callback")
+	}
+}
+
+// handleMessageSent processes the messageSentHandler callback (0x003F).
+// This tells us whether the NCP successfully delivered the message to the device.
+func (c *Controller) handleMessageSent(data []byte) {
+	// Format: type(1) + destination(2) + apsFrame(12) + messageTag(1) + status(1) + messageLen(1) + message(N)
+	if len(data) < 17 {
+		log.Warn().Int("len", len(data)).Msg("messageSentHandler too short")
+		return
+	}
+	msgType := data[0]
+	destination := binary.LittleEndian.Uint16(data[1:3])
+	// APS frame at data[3:15]
+	clusterID := binary.LittleEndian.Uint16(data[5:7])
+	status := data[16]
+
+	if status == emberSuccess {
+		log.Info().
+			Uint8("type", msgType).
+			Uint16("destination", destination).
+			Uint16("cluster", clusterID).
+			Msg("Message delivered successfully")
+	} else {
+		log.Error().
+			Uint8("type", msgType).
+			Uint16("destination", destination).
+			Uint16("cluster", clusterID).
+			Uint8("status", status).
+			Msg("Message delivery FAILED")
 	}
 }
 
@@ -392,10 +426,12 @@ func (c *Controller) handleIncomingMessage(data []byte) {
 
 	profileID := binary.LittleEndian.Uint16(data[1:3])
 
-	log.Debug().
+	log.Info().
 		Uint16("cluster", clusterID).
 		Uint16("sender", sender).
+		Uint16("profile", profileID).
 		Int("msgLen", int(msgLen)).
+		Hex("message", message).
 		Msg("Incoming message")
 
 	// Handle ZDO responses (profile 0x0000)
@@ -790,13 +826,23 @@ func (c *Controller) GetDeviceState(_ context.Context, id string) (device.Device
 
 	// Send Read Attributes to refresh state (retry on transient NCP buffer-full errors)
 	readOnOff := BuildReadAttributesCommand(zclAttrOnOff)
+	log.Info().
+		Uint16("nodeID", kd.NodeID).
+		Uint8("endpoint", kd.Endpoint).
+		Str("device", id).
+		Msg("Sending ReadAttributes for On/Off cluster")
+	var sendErr error
 	for attempt := range 3 {
-		err := c.ezsp.SendUnicast(kd.NodeID, zclProfileHA, zclClusterOnOff, 1, kd.Endpoint, readOnOff)
-		if err == nil {
+		sendErr = c.ezsp.SendUnicast(kd.NodeID, zclProfileHA, zclClusterOnOff, 1, kd.Endpoint, readOnOff)
+		if sendErr == nil {
+			log.Info().Str("device", id).Msg("ReadAttributes sent successfully")
 			break
 		}
-		log.Warn().Err(err).Int("attempt", attempt+1).Str("device", id).Msg("Failed to send ReadAttributes, retrying")
+		log.Warn().Err(sendErr).Int("attempt", attempt+1).Str("device", id).Msg("Failed to send ReadAttributes, retrying")
 		time.Sleep(500 * time.Millisecond)
+	}
+	if sendErr != nil {
+		log.Error().Err(sendErr).Str("device", id).Msg("All ReadAttributes attempts failed")
 	}
 
 	// Wait for the response or timeout
@@ -846,9 +892,16 @@ func (c *Controller) SetDeviceState(_ context.Context, id string, state map[stri
 			}
 
 			payload := BuildOnOffCommand(cmd)
+			log.Info().
+				Uint16("nodeID", kd.NodeID).
+				Uint8("endpoint", kd.Endpoint).
+				Uint8("cmd", cmd).
+				Str("device", id).
+				Msg("Sending On/Off command")
 			if err := c.ezsp.SendUnicast(kd.NodeID, zclProfileHA, zclClusterOnOff, 1, kd.Endpoint, payload); err != nil {
 				return nil, fmt.Errorf("send on/off command: %w", err)
 			}
+			log.Info().Str("device", id).Msg("On/Off command sent successfully")
 
 			c.devicesMu.Lock()
 			kd.State["state"] = strings.ToUpper(strVal)
@@ -949,6 +1002,13 @@ func (c *Controller) IsConnected() bool {
 	c.connMu.RLock()
 	defer c.connMu.RUnlock()
 	return c.connected && c.ash.IsConnected()
+}
+
+// ResetNetwork leaves the current network and clears NCP state so a fresh
+// network will be formed on the next startup.
+func (c *Controller) ResetNetwork() error {
+	log.Info().Msg("Leaving current Zigbee network")
+	return c.ezsp.LeaveNetwork()
 }
 
 func (c *Controller) Close() {

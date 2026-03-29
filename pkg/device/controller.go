@@ -2,6 +2,21 @@ package device
 
 import "context"
 
+type contextKey string
+
+const noCacheKey contextKey = "no-cache"
+
+// WithNoCache returns a context with the no-cache flag set.
+func WithNoCache(ctx context.Context) context.Context {
+	return context.WithValue(ctx, noCacheKey, true)
+}
+
+// NoCache reports whether the no-cache flag is set on ctx.
+func NoCache(ctx context.Context) bool {
+	v, _ := ctx.Value(noCacheKey).(bool)
+	return v
+}
+
 // Controller defines the interface for controlling smart home devices.
 // This abstraction allows the API to work with different protocols
 // (Zigbee, Z-Wave, Matter, WiFi) through a unified interface.

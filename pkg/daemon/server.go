@@ -16,6 +16,15 @@ import (
 	"github.com/urmzd/zigbee-skill/pkg/device"
 )
 
+// reqCtx returns the request context, enriched with no-cache if the header is set.
+func reqCtx(r *http.Request) context.Context {
+	ctx := r.Context()
+	if r.Header.Get(noCacheHeader) == "true" {
+		ctx = device.WithNoCache(ctx)
+	}
+	return ctx
+}
+
 // Server is the daemon HTTP server that keeps the Zigbee connection alive.
 type Server struct {
 	app        *app.App
@@ -135,7 +144,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDevicesList(w http.ResponseWriter, r *http.Request) {
-	devices, err := s.app.Controller.ListDevices(r.Context())
+	devices, err := s.app.Controller.ListDevices(reqCtx(r))
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -148,7 +157,7 @@ func (s *Server) handleDevicesGet(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &req) {
 		return
 	}
-	d, err := s.app.Controller.GetDevice(r.Context(), req.ID)
+	d, err := s.app.Controller.GetDevice(reqCtx(r), req.ID)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -161,7 +170,7 @@ func (s *Server) handleDevicesRename(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &req) {
 		return
 	}
-	if err := s.app.Controller.RenameDevice(r.Context(), req.ID, req.Name); err != nil {
+	if err := s.app.Controller.RenameDevice(reqCtx(r), req.ID, req.Name); err != nil {
 		writeErr(w, err)
 		return
 	}
@@ -173,7 +182,7 @@ func (s *Server) handleDevicesRemove(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &req) {
 		return
 	}
-	if err := s.app.Controller.RemoveDevice(r.Context(), req.ID, req.Force); err != nil {
+	if err := s.app.Controller.RemoveDevice(reqCtx(r), req.ID, req.Force); err != nil {
 		writeErr(w, err)
 		return
 	}
@@ -181,7 +190,7 @@ func (s *Server) handleDevicesRemove(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDevicesClear(w http.ResponseWriter, r *http.Request) {
-	if err := s.app.Controller.ClearDevices(r.Context()); err != nil {
+	if err := s.app.Controller.ClearDevices(reqCtx(r)); err != nil {
 		writeErr(w, err)
 		return
 	}
@@ -193,7 +202,7 @@ func (s *Server) handleDevicesState(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &req) {
 		return
 	}
-	st, err := s.app.Controller.GetDeviceState(r.Context(), req.ID)
+	st, err := s.app.Controller.GetDeviceState(reqCtx(r), req.ID)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -206,7 +215,7 @@ func (s *Server) handleDevicesSet(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &req) {
 		return
 	}
-	st, err := s.app.Controller.SetDeviceState(r.Context(), req.ID, req.State)
+	st, err := s.app.Controller.SetDeviceState(reqCtx(r), req.ID, req.State)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -219,7 +228,7 @@ func (s *Server) handleDiscoveryPermit(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &req) {
 		return
 	}
-	if err := s.app.Controller.PermitJoin(r.Context(), req.Enable, req.Duration); err != nil {
+	if err := s.app.Controller.PermitJoin(reqCtx(r), req.Enable, req.Duration); err != nil {
 		writeErr(w, err)
 		return
 	}

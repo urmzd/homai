@@ -51,6 +51,9 @@ type Controller struct {
 	connected bool
 	connMu    sync.RWMutex
 
+	nwkAddrWaiters map[string]chan uint16 // IEEE string -> response channel
+	nwkAddrMu      sync.Mutex
+
 	onDeviceChange func() // called after device join/leave/rename
 	stopChan       chan struct{}
 }
@@ -92,24 +95,78 @@ func (c *Controller) notifyDeviceChange() {
 }
 
 // LoadDevices pre-populates the in-memory device map from persistent storage.
-// Devices loaded this way have NodeID=0 until they rejoin the network.
+// It first queries the NCP address table for NodeIDs, then falls back to
+// broadcasting ZDO NWK_addr_req to resolve devices still on the network.
 func (c *Controller) LoadDevices(entries []LoadEntry) {
-	c.devicesMu.Lock()
-	defer c.devicesMu.Unlock()
 	for _, e := range entries {
 		ieee := formatIEEE(e.IEEEAddress)
 		ep := e.Endpoint
 		if ep == 0 {
 			ep = 1
 		}
+
+		// Try NCP address table first (fast, local).
+		var nodeID uint16
+		if nid, err := c.ezsp.LookupNodeIDByEUI64(e.IEEEAddress); err == nil && nid != 0xFFFE && nid != 0xFFFF {
+			nodeID = nid
+			log.Info().Str("ieee", ieee).Uint16("nodeID", nid).Msg("Resolved NodeID from NCP address table")
+		}
+
+		// Fall back to ZDO NWK_addr_req broadcast (asks the device directly).
+		if nodeID == 0 {
+			if nid, err := c.resolveNodeIDByIEEE(e.IEEEAddress); err == nil && nid != 0 {
+				nodeID = nid
+				log.Info().Str("ieee", ieee).Uint16("nodeID", nid).Msg("Resolved NodeID via NWK_addr_req")
+			} else {
+				log.Warn().Str("ieee", ieee).Msg("Could not resolve NodeID — device will need to rejoin")
+			}
+		}
+
+		c.devicesMu.Lock()
 		c.devices[ieee] = &KnownDevice{
 			IEEEAddress:  e.IEEEAddress,
+			NodeID:       nodeID,
 			FriendlyName: e.FriendlyName,
 			DeviceType:   e.DeviceType,
 			Endpoint:     ep,
 			Clusters:     e.Clusters,
 			State:        make(device.DeviceState),
 		}
+		c.devicesMu.Unlock()
+	}
+}
+
+// resolveNodeIDByIEEE broadcasts a ZDO NWK_addr_req for the given IEEE address
+// and waits up to 5 seconds for the device to respond with its NodeID.
+func (c *Controller) resolveNodeIDByIEEE(ieee [8]byte) (uint16, error) {
+	// NWK_addr_req payload: IEEEAddr(8) + RequestType(1) + StartIndex(1)
+	payload := make([]byte, 10)
+	copy(payload[0:8], ieee[:])
+	payload[8] = 0x00 // single device response
+	payload[9] = 0x00 // start index
+
+	ch := make(chan uint16, 1)
+	ieeeStr := formatIEEE(ieee)
+
+	// Temporarily register a one-shot handler for the response.
+	c.nwkAddrMu.Lock()
+	c.nwkAddrWaiters[ieeeStr] = ch
+	c.nwkAddrMu.Unlock()
+	defer func() {
+		c.nwkAddrMu.Lock()
+		delete(c.nwkAddrWaiters, ieeeStr)
+		c.nwkAddrMu.Unlock()
+	}()
+
+	if err := c.ezsp.SendBroadcast(0xFFFD, zdoProfileID, zdoClusterNWKAddrReq, 0, 0, payload, 0); err != nil {
+		return 0, fmt.Errorf("send NWK_addr_req: %w", err)
+	}
+
+	select {
+	case nid := <-ch:
+		return nid, nil
+	case <-time.After(5 * time.Second):
+		return 0, fmt.Errorf("NWK_addr_req timeout for %s", ieeeStr)
 	}
 }
 
@@ -128,8 +185,9 @@ func NewController(portPath string) (*Controller, error) {
 		serial:   s,
 		ash:      ash,
 		ezsp:     ezsp,
-		devices:  make(map[string]*KnownDevice),
-		stopChan: make(chan struct{}),
+		devices:        make(map[string]*KnownDevice),
+		nwkAddrWaiters: make(map[string]chan uint16),
+		stopChan:       make(chan struct{}),
 	}
 
 	// Set up callback handler
@@ -800,7 +858,9 @@ func (c *Controller) ClearDevices(_ context.Context) error {
 	return nil
 }
 
-func (c *Controller) GetDeviceState(_ context.Context, id string) (device.DeviceState, error) {
+func (c *Controller) GetDeviceState(ctx context.Context, id string) (device.DeviceState, error) {
+	noCache := device.NoCache(ctx)
+
 	c.devicesMu.RLock()
 	kd, ok := c.resolveDevice(id)
 	c.devicesMu.RUnlock()
@@ -811,6 +871,14 @@ func (c *Controller) GetDeviceState(_ context.Context, id string) (device.Device
 
 	if err := c.waitForDevice(kd, id); err != nil {
 		return nil, err
+	}
+
+	// When --no-cache is set, clear cached state so a timeout returns empty/error
+	// instead of stale data.
+	if noCache {
+		c.devicesMu.Lock()
+		kd.State = make(device.DeviceState)
+		c.devicesMu.Unlock()
 	}
 
 	// Set up channel to wait for the state response.
@@ -846,11 +914,17 @@ func (c *Controller) GetDeviceState(_ context.Context, id string) (device.Device
 	}
 
 	// Wait for the response or timeout
+	timedOut := false
 	select {
 	case <-ch:
 		log.Debug().Str("device", id).Msg("Received state update from device")
 	case <-time.After(5 * time.Second):
 		log.Warn().Str("device", id).Msg("Timed out waiting for state response")
+		timedOut = true
+	}
+
+	if timedOut && noCache {
+		return nil, fmt.Errorf("%w: device %q did not respond within timeout", device.ErrTimeout, id)
 	}
 
 	c.devicesMu.RLock()
@@ -1134,15 +1208,45 @@ func (c *Controller) discoverDeviceClusters(kd *KnownDevice) {
 		Msg("Device clusters discovered")
 }
 
-// handleZDOResponse processes ZDO response messages (Active Endpoints, Simple Descriptor).
+// handleZDOResponse processes ZDO response messages (Active Endpoints, Simple Descriptor, NWK_addr).
 func (c *Controller) handleZDOResponse(clusterID uint16, sender uint16, message []byte) bool {
 	switch clusterID {
+	case zdoClusterNWKAddrResp:
+		return c.handleNWKAddrResponse(message)
 	case zdoClusterActiveEndpointsResp:
 		return c.handleActiveEndpointsResponse(sender, message)
 	case zdoClusterSimpleDescriptorResp:
 		return c.handleSimpleDescriptorResponse(sender, message)
 	}
 	return false
+}
+
+// handleNWKAddrResponse processes a ZDO NWK_addr_rsp and unblocks any waiter.
+func (c *Controller) handleNWKAddrResponse(data []byte) bool {
+	// NWK_addr_rsp: seq(1) + status(1) + IEEEAddr(8) + NWKAddr(2)
+	if len(data) < 12 {
+		return false
+	}
+	status := data[1]
+	if status != 0x00 {
+		return true
+	}
+	var ieee [8]byte
+	copy(ieee[:], data[2:10])
+	nodeID := binary.LittleEndian.Uint16(data[10:12])
+	ieeeStr := formatIEEE(ieee)
+
+	log.Info().Str("ieee", ieeeStr).Uint16("nodeID", nodeID).Msg("NWK_addr_rsp received")
+
+	c.nwkAddrMu.Lock()
+	if ch, ok := c.nwkAddrWaiters[ieeeStr]; ok {
+		select {
+		case ch <- nodeID:
+		default:
+		}
+	}
+	c.nwkAddrMu.Unlock()
+	return true
 }
 
 func (c *Controller) handleActiveEndpointsResponse(sender uint16, data []byte) bool {

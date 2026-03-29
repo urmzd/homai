@@ -29,6 +29,7 @@ const (
 	ezspSetInitialSecurityState uint16 = 0x0068
 	ezspImportTransientKey      uint16 = 0x0111
 	ezspGetNodeID               uint16 = 0x0027
+	ezspLookupNodeIDByEUI64     uint16 = 0x0060
 
 	// Callbacks
 	ezspTrustCenterJoinHandler  uint16 = 0x0024
@@ -97,6 +98,8 @@ const (
 	zdoClusterActiveEndpointsResp  uint16 = 0x8005
 	zdoClusterSimpleDescriptorReq  uint16 = 0x0004
 	zdoClusterSimpleDescriptorResp uint16 = 0x8004
+	zdoClusterNWKAddrReq           uint16 = 0x0000
+	zdoClusterNWKAddrResp          uint16 = 0x8000
 	zdoClusterDeviceAnnce          uint16 = 0x0013
 	zdoClusterMgmtLeaveReq         uint16 = 0x0034
 
@@ -760,6 +763,19 @@ func (e *EZSPLayer) GetNodeID() (uint16, error) {
 	}
 	if len(resp) < 2 {
 		return 0, fmt.Errorf("getNodeID response too short: %d bytes", len(resp))
+	}
+	return binary.LittleEndian.Uint16(resp[0:2]), nil
+}
+
+// LookupNodeIDByEUI64 asks the NCP's address table for the short NodeID
+// associated with the given 64-bit IEEE address. Returns 0xFFFE if unknown.
+func (e *EZSPLayer) LookupNodeIDByEUI64(eui64 [8]byte) (uint16, error) {
+	resp, err := e.SendCommand(ezspLookupNodeIDByEUI64, eui64[:])
+	if err != nil {
+		return 0, err
+	}
+	if len(resp) < 2 {
+		return 0, fmt.Errorf("lookupNodeIDByEUI64 response too short: %d bytes", len(resp))
 	}
 	return binary.LittleEndian.Uint16(resp[0:2]), nil
 }

@@ -36,7 +36,7 @@ func main() {
 	// Extract global flags
 	var configPath, serialPort string
 	var socketPath, pidPath, logPath string
-	var daemonForeground bool
+	var daemonForeground, noCache bool
 	var filtered []string
 	for i := 0; i < len(args); i++ {
 		switch {
@@ -67,6 +67,8 @@ func main() {
 			logPath = args[i][len("--log="):]
 		case args[i] == "--daemon-foreground":
 			daemonForeground = true
+		case args[i] == "--no-cache":
+			noCache = true
 		default:
 			filtered = append(filtered, args[i])
 		}
@@ -116,6 +118,9 @@ func main() {
 	}
 
 	ctx := context.Background()
+	if noCache {
+		ctx = device.WithNoCache(ctx)
+	}
 
 	// Auto-detect running daemon and route through it.
 	var a *app.App
@@ -384,8 +389,9 @@ func cmdDaemon(args []string, socketPath, pidPath, logPath, configPath, serialPo
 		if err := daemon.Fork(logPath, forkArgs); err != nil {
 			return fmt.Errorf("start daemon: %w", err)
 		}
-		// Wait for socket to appear (up to 5 seconds).
-		for range 50 {
+		// Wait for socket to appear (up to 30 seconds — device NodeID
+		// resolution during startup may take several seconds per device).
+		for range 300 {
 			if _, err := os.Stat(socketPath); err == nil {
 				return output(map[string]any{
 					"status":  "started",
@@ -582,6 +588,7 @@ Global flags:
   --socket <path>   Daemon Unix socket (default: /tmp/zigbee-skill.sock)
   --pid <path>      Daemon PID file (default: /tmp/zigbee-skill.pid)
   --log <path>      Daemon log file (default: /tmp/zigbee-skill.log)
+  --no-cache        Bypass cached device state (returns error on timeout instead of stale data)
 
 When the daemon is running, all commands route through it automatically.
 All output is JSON. Pipe to jq for filtering.

@@ -2,6 +2,9 @@ package app
 
 import (
 	"context"
+	"encoding/hex"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -43,12 +46,10 @@ func New(_ context.Context, configPath, serialPort string) (*App, error) {
 			controller = device.NewNullController()
 			events = device.NewNullEventSubscriber()
 		} else {
-			// TODO: Re-enable once NodeID persistence is implemented.
-			// Skipping device cache load — persisted devices have NodeID=0
-			// and cannot communicate until they rejoin the network.
-			// entries := configToLoadEntries(cfg)
-			// zbController.LoadDevices(entries)
-			log.Info().Msg("Device cache loading disabled (devices must rejoin via discovery)")
+			if entries := configToLoadEntries(cfg); len(entries) > 0 {
+				zbController.LoadDevices(entries)
+				log.Info().Int("count", len(entries)).Msg("Loaded persisted devices (NodeID assigned on rejoin)")
+			}
 
 			// Wire persistence: save config when devices change
 			zbController.SetOnDeviceChange(func() {
@@ -85,6 +86,42 @@ func (a *App) Close() {
 	if a.Controller != nil {
 		a.Controller.Close()
 	}
+}
+
+// configToLoadEntries converts persisted config devices into LoadEntry values
+// for pre-populating the controller's device map on startup.
+func configToLoadEntries(cfg *config.Config) []zigbee.LoadEntry {
+	entries := make([]zigbee.LoadEntry, 0, len(cfg.Devices))
+	for _, d := range cfg.Devices {
+		addr, err := parseIEEE(d.IEEEAddress)
+		if err != nil {
+			log.Warn().Str("ieee", d.IEEEAddress).Err(err).Msg("Skipping device with invalid IEEE address")
+			continue
+		}
+		entries = append(entries, zigbee.LoadEntry{
+			IEEEAddress:  addr,
+			FriendlyName: d.FriendlyName,
+			DeviceType:   d.Type,
+			Endpoint:     d.Endpoint,
+			Clusters:     d.Clusters,
+		})
+	}
+	return entries
+}
+
+// parseIEEE converts a colon-separated IEEE address string (e.g. "ff:ff:b4:0e:06:07:77:37")
+// to an [8]byte in little-endian order (matching formatIEEE in the zigbee package).
+func parseIEEE(s string) ([8]byte, error) {
+	var addr [8]byte
+	b, err := hex.DecodeString(strings.ReplaceAll(s, ":", ""))
+	if err != nil || len(b) != 8 {
+		return addr, fmt.Errorf("invalid IEEE address: %s", s)
+	}
+	// formatIEEE prints bytes 7..0, so the string is big-endian; reverse to little-endian.
+	for i := range 8 {
+		addr[i] = b[7-i]
+	}
+	return addr, nil
 }
 
 // syncDevicesToConfig exports the controller's in-memory devices to config.

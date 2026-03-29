@@ -224,7 +224,12 @@ This project implements the Zigbee PRO stack. The relevant specs are available (
 - **PRO Base Device Behavior v3.1** — Zigbee 3.0 commissioning, trust center, network steering
 - **Zigbee Cluster Library R8** — ZCL cluster/command definitions (On/Off, Level Control, etc.)
 
-## Tested Hardware
+## Supported Devices
 
-- SONOFF Zigbee 3.0 USB Dongle Plus
-- Sylvania A19 70052
+<!-- embed-src src="docs/supported-devices.md" -->
+| Manufacturer | Model | Model ID | Type | Clusters | Notes |
+|---|---|---|---|---|---|
+| Third Reality | Smart Plug Gen2 | 3RSP019BZ | switch | On/Off (0x0006) | Ships in BLE mode — hold button 5s to switch to Zigbee. Factory reset: hold 10s. |
+| SONOFF | Zigbee 3.0 USB Dongle Plus | — | coordinator | — | EFR32MG21 based. EZSP protocol. Used as the Zigbee coordinator. |
+| Sylvania | A19 70052 | — | light | On/Off, Level Control | — |
+<!-- /embed-src -->

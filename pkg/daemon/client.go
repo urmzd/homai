@@ -13,6 +13,8 @@ import (
 	"github.com/urmzd/zigbee-skill/pkg/device"
 )
 
+const noCacheHeader = "X-No-Cache"
+
 // DaemonClient implements device.Controller by proxying to the daemon over a Unix socket.
 type DaemonClient struct {
 	http       *http.Client
@@ -47,6 +49,9 @@ func (c *DaemonClient) post(ctx context.Context, path string, reqBody any) (*htt
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if device.NoCache(ctx) {
+		req.Header.Set("X-No-Cache", "true")
+	}
 	return c.http.Do(req)
 }
 

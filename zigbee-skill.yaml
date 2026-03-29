@@ -1,0 +1,10 @@
+serial:
+    port: /dev/cu.usbserial-2140
+devices:
+    - ieee_address: ff:ff:b4:0e:06:07:77:37
+      friendly_name: switch-one
+      type: switch
+      endpoint: 1
+      clusters:
+        - 6
+      last_seen: 2026-03-28T22:49:07.289137-05:00

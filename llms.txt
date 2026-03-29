@@ -1,21 +1,21 @@
-# Zigbee REST (zigbee-rest)
+# Zigbee Skill (zigbee-skill)
 
-> A local-first, privacy-focused smart home control system written in Go. Controls Zigbee devices directly via EZSP serial protocol through a REST API and CLI without cloud dependencies or MQTT brokers. Features device discovery via SSE, multi-profile support, JSON schema-validated device state, and cross-platform binaries.
+> An AI-native smart home skill written in Go. Gives AI agents direct control over Zigbee devices via EZSP serial protocol — no cloud, no MQTT broker. Learns and adapts to user preferences for personalized home automation through natural language. Features device discovery via SSE, multi-profile support, JSON schema-validated device state, and cross-platform binaries.
 
 ## Docs
 
-- [README](https://github.com/urmzd/zigbee-rest/blob/main/README.md): Installation, usage, and examples
-- [AGENTS.md](https://github.com/urmzd/zigbee-rest/blob/main/AGENTS.md): Architecture, CLI reference, and API endpoints
+- [README](https://github.com/urmzd/zigbee-skill/blob/main/README.md): Installation, usage, and examples
+- [AGENTS.md](https://github.com/urmzd/zigbee-skill/blob/main/AGENTS.md): Architecture, CLI reference, and API endpoints
 
 ## API / Key Files
 
-- [cmd/api/main.go](https://github.com/urmzd/zigbee-rest/blob/main/cmd/api/main.go): API server entry point
-- [cmd/cli/main.go](https://github.com/urmzd/zigbee-rest/blob/main/cmd/cli/main.go): CLI entry point
-- [pkg/api/router.go](https://github.com/urmzd/zigbee-rest/blob/main/pkg/api/router.go): Gin HTTP router and endpoint definitions
-- [pkg/zigbee/ezsp.go](https://github.com/urmzd/zigbee-rest/blob/main/pkg/zigbee/ezsp.go): EZSP serial protocol layer
-- [pkg/device/controller.go](https://github.com/urmzd/zigbee-rest/blob/main/pkg/device/controller.go): Device abstraction layer
-- [pkg/db/db.go](https://github.com/urmzd/zigbee-rest/blob/main/pkg/db/db.go): SQLite persistence
+- [cmd/api/main.go](https://github.com/urmzd/zigbee-skill/blob/main/cmd/api/main.go): API server entry point
+- [cmd/cli/main.go](https://github.com/urmzd/zigbee-skill/blob/main/cmd/cli/main.go): CLI entry point
+- [pkg/api/router.go](https://github.com/urmzd/zigbee-skill/blob/main/pkg/api/router.go): Gin HTTP router and endpoint definitions
+- [pkg/zigbee/ezsp.go](https://github.com/urmzd/zigbee-skill/blob/main/pkg/zigbee/ezsp.go): EZSP serial protocol layer
+- [pkg/device/controller.go](https://github.com/urmzd/zigbee-skill/blob/main/pkg/device/controller.go): Device abstraction layer
+- [pkg/db/db.go](https://github.com/urmzd/zigbee-skill/blob/main/pkg/db/db.go): SQLite persistence
 
 ## Optional
 
-- [CONTRIBUTING](https://github.com/urmzd/zigbee-rest/blob/main/CONTRIBUTING.md): How to contribute
+- [CONTRIBUTING](https://github.com/urmzd/zigbee-skill/blob/main/CONTRIBUTING.md): How to contribute

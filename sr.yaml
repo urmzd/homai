@@ -5,14 +5,27 @@ changelog:
   file: CHANGELOG.md
 floating_tags: true
 types:
-  - { type: feat, bump: minor }
-  - { type: fix, bump: patch }
-  - { type: perf, bump: patch }
-  - { type: docs }
-  - { type: refactor }
-  - { type: revert }
-  - { type: chore }
-  - { type: ci }
-  - { type: test }
-  - { type: build }
-  - { type: style }
+  - name: feat
+    bump: minor
+    section: Features
+  - name: fix
+    bump: patch
+    section: Bug Fixes
+  - name: perf
+    bump: patch
+    section: Performance
+  - name: docs
+    section: Documentation
+  - name: refactor
+    bump: patch
+    section: Refactoring
+  - name: revert
+    section: Reverts
+  - name: chore
+  - name: ci
+  - name: test
+  - name: build
+  - name: style
+hooks:
+  commit-msg:
+    - sr hook commit-msg

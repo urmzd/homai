@@ -2,91 +2,126 @@
 
 ## Project Overview
 
-Zigbee REST is a local-first smart home controller written in Go. It controls Zigbee devices directly via EZSP serial protocol and exposes a REST API + CLI. No cloud, no MQTT broker.
+Zigbee Skill is an AI-native smart home tool written in Go. It gives AI agents direct control over Zigbee devices via EZSP serial protocol, enabling homes that adapt to user preferences through natural interaction. No cloud, no MQTT broker.
 
-**Key tech:** Go 1.24, Gin, SQLite, EZSP/Zigbee, `just` task runner
+**Key tech:** Go 1.24, EZSP v13 (EFR32MG21), `just` task runner
+
+**Hardware:** Sonoff Zigbee 3.0 USB Dongle Plus V2 at `/dev/cu.SLAB_USBtoUART`
+
+## Specification References
+
+All protocol work MUST be verified against these specs before implementation:
+
+### BDB 3.1 — `specs/csa-iot/22-65816-030-PRO-BDB-v3.1-Specification.pdf`
+Base Device Behavior. Governs coordinator initialization, commissioning, and security.
+
+| Section | Topic | Key details |
+|---------|-------|-------------|
+| 5.6 | Trust Center configuration | TC policy table (Table 9), backwards compatibility mode |
+| 5.6.1 | TC policies | `requireInstallCodesOrPresetPassphrase` default=0x02, `allowRejoinsWithWellKnownKey` default=FALSE |
+| 5.6.2 | Backwards compat mode | Set `requireInstallCodesOrPresetPassphrase`=0x01 + `allowRejoinsWithWellKnownKey`=TRUE for legacy devices |
+| 5.6.3 | Join policy | IEEELIST_JOIN (0x01) requires `mibJoiningIeeeList` maintenance |
+| 5.6.4 | Joining using DLK | DLK only with install code or unique passphrase; reject if no `apsDeviceKeyPairSet` entry |
+| 5.6.5 | Symmetric key joiner timeout | TC MUST timeout join within `bdbcfTrustCenterNodeJoinTimeout` seconds |
+| 6.4 | Minimum requirements | R23+ stack, profile 0x0104 on all endpoints, simple descriptors |
+| 6.5 | Default reporting config | Max reporting interval 0x003d–0xfffe for mandatory reportable attributes |
+| 6.10 | APS ACK and security | If command received with APS security, response MUST also use APS security |
+| 7.1 | Initialization procedure | Restore persistent data → rejoin → Device_annce → TCLK update |
+| 7.2 | On-network TCLK update | Nodes MUST obtain unique verified TC link key after join |
+| 7.3 | Ensuring TC connectivity | Keep Alive cluster (server) + Poll Control cluster (client) required on TC |
+| 8.1 | Network formation | Energy scan before forming; select quietest channel |
+| 9.2 | Symmetric key exchange | Key negotiation flow for devices joining via well-known key |
+
+### Zigbee R23.2 — `specs/csa-iot/docs-06-3474-23-csg-zigbee-specificationR23.2_clean.pdf`
+Core Zigbee specification. Covers APS, NWK, security, ZDO, and ZCL layers.
+
+Relevant chapters (large document — use targeted page reads):
+- **Chapter 2** — Application layer (APS frame format, endpoints, profiles, descriptors)
+- **Chapter 3** — Network layer (routing, joining, address assignment)
+- **Chapter 4** — Security (network key, link keys, frame counters, trust center)
+- **Annex G** — Inter-PAN
+
+### EZSP (not in repo — Silicon Labs docs)
+EmberZNet Serial Protocol. The host↔NCP wire protocol.
+
+| Concept | Details |
+|---------|---------|
+| Frame format | Legacy (v7-) vs Extended (v8+); extended after successful version negotiation |
+| `addEndpoint` (0x0002) | MUST register HA endpoints before NetworkInit or device responses are silently dropped |
+| `sendUnicast` (0x0034) | APS frame options: 0x0020=ENCRYPTION, 0x0040=RETRY, 0x0100=ROUTE_DISCOVERY |
+| `sendBroadcast` (0x0036) | Used for ZDO broadcasts (Device_annce, permit join) |
+| Trust Center Join Handler | `EmberDeviceUpdate`: 0=SECURED_REJOIN, 1=UNSECURED_JOIN, 2=DEVICE_LEFT, 3=UNSECURED_REJOIN |
+| Status codes | 0x00=SUCCESS, 0x66=NO_BUFFERS, 0x84=MAX_MESSAGE_LIMIT_REACHED |
+
+## Architecture
+
+```
+cmd/cli/main.go          CLI binary (daemon mode or direct)
+pkg/app/                  App initialization, wires controller+events+validator
+pkg/config/               YAML config (zigbee-skill.yaml)
+pkg/daemon/               Background daemon (unix socket server/client)
+pkg/device/               Controller interface, Device model, NullController
+pkg/device/schema/        JSON schema validator for device state
+pkg/zigbee/controller.go  Zigbee coordinator: init, join, discovery, state read/write
+pkg/zigbee/ezsp.go        EZSP layer: ASH framing, command/response, callbacks
+pkg/zigbee/ash.go         ASH serial transport (RST, DATA, ACK, NAK, ERROR)
+pkg/zigbee/zcl.go         ZCL frame encoding/decoding (global + cluster-specific)
+pkg/zigbee/serial.go      Serial port abstraction
+```
+
+### Message flow: host → device
+1. CLI calls `Controller.SetDeviceState()` (or `GetDeviceState()`)
+2. Controller builds ZCL frame via `zcl.go` (`BuildOnOffCommand` / `BuildReadAttributesCommand`)
+3. Controller calls `ezsp.SendUnicast()` which wraps in APS frame + EZSP command
+4. EZSP layer sends via ASH DATA frame over serial
+5. NCP transmits over-the-air; device responds
+6. ASH read loop → EZSP `readLoop` → callback dispatch → `handleIncomingMessage` → `updateDeviceStateFromZCL`
+
+### Known issues (active)
+- Device ZCL Read Attributes gets no response — likely `addEndpoint` not called or NCP buffer full (status 0x84)
+- TC join status=1 (UNSECURED_JOIN) means key exchange incomplete; device keeps re-joining
+- `SetDeviceState` returns optimistic state, not confirmed device state
 
 ## Setup
 
 ```bash
-# Build all binaries (outputs to bin/)
+# Build with version
+go build -ldflags "-X main.version=$(git rev-parse --short HEAD)" -o zigbee-skill ./cmd/cli/
+
+# Or via just
 just build
-
-# Or build manually
-go build -o bin/api ./cmd/api
-go build -o bin/cli ./cmd/cli
 ```
-
-## Running
-
-```bash
-# Start API server (default: 0.0.0.0:8080)
-./bin/api --port /dev/cu.SLAB_USBtoUART
-
-# Custom database path (default: ~/.config/zigbee-rest/zigbee-rest.db)
-./bin/api --db /path/to/zigbee-rest.db --port /dev/ttyUSB0
-```
-
-The database is auto-created and migrated on first run.
 
 ## CLI
 
-The CLI outputs JSON to stdout and errors to stderr. It talks to the running API server.
+The CLI outputs JSON to stdout and logs/errors to stderr. It auto-routes through the daemon when running.
 
 ```bash
-zigbee-rest health
-zigbee-rest devices list
-zigbee-rest devices get <id>
-zigbee-rest devices rename <id> --name <name>
-zigbee-rest devices remove <id>
-zigbee-rest devices state <id>
-zigbee-rest devices set <id> --state ON --brightness 150
-zigbee-rest discovery start [--duration 120]
-zigbee-rest discovery stop
+zigbee-skill health
+zigbee-skill daemon start|stop|status
+zigbee-skill devices list|get|rename|remove|clear|state|set
+zigbee-skill discovery start [--duration 120] [--wait-for N]
+zigbee-skill discovery stop
 ```
 
 `<id>` is a device's IEEE address or friendly name.
 
-Use `--address <url>` to target a different API server (default: `http://localhost:8080`).
-
 ### Examples
 
 ```bash
-# List device names
-zigbee-rest devices list | jq '.devices[].friendly_name'
-
-# Turn on a light
-zigbee-rest devices set bedroom-lamp --state ON
-
-# Set brightness
-zigbee-rest devices set bedroom-lamp --state ON --brightness 150
-
-# Turn off
-zigbee-rest devices set bedroom-lamp --state OFF
-
-# Get current state
-zigbee-rest devices state bedroom-lamp | jq '.state'
-
-# Pair a new device
-zigbee-rest discovery start --duration 120
+zigbee-skill daemon start --port /dev/cu.SLAB_USBtoUART
+zigbee-skill devices list | jq '.devices[].friendly_name'
+zigbee-skill devices set smart-plug --state ON
+zigbee-skill devices state smart-plug
+zigbee-skill devices clear
+zigbee-skill daemon stop
 ```
 
 ### Response shapes
 
-**List devices:** `{"devices": [{...}], "count": N}` — each device has `ieee_address`, `friendly_name`, `type`, `state`
+**Device state:** `{"device": "name", "state": {"state": "ON"}, "timestamp": "..."}`
 
-**Device state:** `{"device": "name", "state": {"state": "ON", "brightness": 200}, "timestamp": "..."}`
-
-**Errors:** `{"error": "error_code", "message": "..."}` — 400 (validation), 404 (not found), 504 (timeout)
-
-### State properties
-
-State objects are device-specific and validated against each device's JSON schema. Common light properties:
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `state` | `"ON"` / `"OFF"` | Power state |
-| `brightness` | number | Brightness level (device-specific range) |
+**Errors:** exit code 1, message to stderr
 
 ## Development
 
@@ -94,10 +129,6 @@ State objects are device-specific and validated against each device's JSON schem
 just check        # lint + test (default)
 just test         # go test ./...
 just lint         # gofmt, golangci-lint, go vet
-just swagger      # regenerate swagger docs
-just run          # live reload with air
-just open-db      # open sqlite3 shell
-just reset-db     # delete database file
 just clean        # remove bin/
 ```
 
@@ -105,10 +136,7 @@ just clean        # remove bin/
 
 - Standard Go conventions: `gofmt`, `go vet`, `golangci-lint`
 - Package layout: `cmd/` for binaries, `pkg/` for libraries
-- `pkg/zigbee/` — EZSP serial protocol and Zigbee stack
-- `pkg/api/` — Gin HTTP handlers and router
-- `pkg/device/` — device abstraction layer
-- `pkg/db/` — SQLite persistence and config
+- Version-based EZSP interfaces (user preference — see memory)
 
 ## CI
 

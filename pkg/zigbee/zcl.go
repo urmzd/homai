@@ -4,8 +4,20 @@ import "encoding/binary"
 
 // ZCL cluster IDs
 const (
-	zclClusterOnOff        uint16 = 0x0006
-	zclClusterLevelControl uint16 = 0x0008
+	zclClusterOnOff             uint16 = 0x0006
+	zclClusterLevelControl      uint16 = 0x0008
+	zclClusterColorControl      uint16 = 0x0300
+	zclClusterTemperature       uint16 = 0x0402
+	zclClusterRelativeHumidity  uint16 = 0x0405
+	zclClusterOccupancy         uint16 = 0x0406
+	zclClusterIlluminance       uint16 = 0x0400
+	zclClusterPressure          uint16 = 0x0403
+	zclClusterElectricalMeasure uint16 = 0x0B04
+	zclClusterMetering          uint16 = 0x0702
+	zclClusterDoorLock          uint16 = 0x0101
+	zclClusterWindowCovering    uint16 = 0x0102
+	zclClusterThermostat        uint16 = 0x0201
+	zclClusterKeepAlive         uint16 = 0x0025
 )
 
 // ZCL command IDs for On/Off cluster
@@ -31,6 +43,7 @@ const (
 const (
 	zclGlobalReadAttributes         uint8 = 0x00
 	zclGlobalReadAttributesResponse uint8 = 0x01
+	zclGlobalConfigureReporting     uint8 = 0x06
 )
 
 // ZCL direction
@@ -185,4 +198,46 @@ func zclDataTypeLength(dataType uint8, data []byte) int {
 	default:
 		return -1
 	}
+}
+
+// BuildConfigureReportingCommand builds a ZCL Configure Reporting command (BDB 6.5).
+func BuildConfigureReportingCommand(attrID uint16, dataType uint8, minInterval, maxInterval uint16, reportableChange []byte) []byte {
+	// Direction (1) + Attribute ID (2) + Data Type (1) + Min Interval (2) + Max Interval (2) + Reportable Change (variable)
+	payload := make([]byte, 0, 7+len(reportableChange))
+	payload = append(payload, 0x00) // direction: reported
+	payload = append(payload, byte(attrID), byte(attrID>>8))
+	payload = append(payload, dataType)
+	payload = append(payload, byte(minInterval), byte(minInterval>>8))
+	payload = append(payload, byte(maxInterval), byte(maxInterval>>8))
+	payload = append(payload, reportableChange...)
+	return EncodeZCLGlobalCommand(zclGlobalConfigureReporting, payload)
+}
+
+// ZCLAttrValue represents an attribute ID, data type, and value for ZCL responses.
+type ZCLAttrValue struct {
+	ID       uint16
+	DataType uint8
+	Value    []byte
+}
+
+// BuildReadAttributesResponsePayload builds a ZCL Read Attributes Response for given attribute values.
+func BuildReadAttributesResponsePayload(attrs []ZCLAttrValue) []byte {
+	frame := make([]byte, 0, 64)
+	for _, attr := range attrs {
+		frame = append(frame, byte(attr.ID), byte(attr.ID>>8))
+		frame = append(frame, 0x00) // status: success
+		frame = append(frame, attr.DataType)
+		frame = append(frame, attr.Value...)
+	}
+	return frame
+}
+
+// EncodeZCLGlobalResponse builds a server-to-client ZCL global response frame.
+func EncodeZCLGlobalResponse(seqNum uint8, commandID uint8, payload []byte) []byte {
+	frame := make([]byte, 0, 3+len(payload))
+	frame = append(frame, zclFrameTypeGlobal|zclDirectionServerToClient) // server->client
+	frame = append(frame, seqNum)
+	frame = append(frame, commandID)
+	frame = append(frame, payload...)
+	return frame
 }

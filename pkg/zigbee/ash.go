@@ -258,6 +258,7 @@ func (a *ASHLayer) readLoop() {
 				return
 			}
 			log.Error().Err(err).Msg("ASH read error")
+			time.Sleep(time.Second)
 			continue
 		}
 
@@ -392,9 +393,8 @@ func (a *ASHLayer) handleData(payload []byte) {
 			log.Error().Err(err).Msg("Failed to send ACK")
 		}
 
-		// Extract EZSP data (skip control byte)
-		ezspData := make([]byte, len(payload)-1)
-		copy(ezspData, payload[1:])
+		// Extract EZSP data (skip control byte) and de-randomize.
+		ezspData := ashRandomize(payload[1:])
 
 		select {
 		case a.recvChan <- ezspData:
@@ -460,11 +460,31 @@ func (a *ASHLayer) sendNAK() {
 	}
 }
 
-// buildDataFrame builds a complete ASH DATA frame with byte stuffing.
+// ashRandomize XORs data with a pseudo-random sequence (LFSR, seed 0x42)
+// as required by the ASH protocol for DATA frame payloads (UG101 §4.3).
+func ashRandomize(data []byte) []byte {
+	out := make([]byte, len(data))
+	rand := byte(0x42)
+	for i, b := range data {
+		out[i] = b ^ rand
+		if rand&0x01 != 0 {
+			rand = (rand >> 1) ^ 0xB8
+		} else {
+			rand >>= 1
+		}
+	}
+	return out
+}
+
+// buildDataFrame builds a complete ASH DATA frame with data randomization,
+// CRC, and byte stuffing per UG101.
 func (a *ASHLayer) buildDataFrame(control byte, payload []byte) []byte {
-	raw := make([]byte, 0, len(payload)+3)
+	// Randomize the EZSP payload before CRC computation.
+	randomized := ashRandomize(payload)
+
+	raw := make([]byte, 0, len(randomized)+3)
 	raw = append(raw, control)
-	raw = append(raw, payload...)
+	raw = append(raw, randomized...)
 
 	crc := crcCCITT(raw)
 	raw = append(raw, byte(crc>>8), byte(crc&0xFF))

@@ -27,6 +27,10 @@ func (c *NullController) RemoveDevice(ctx context.Context, id string, force bool
 	return ErrNotConnected
 }
 
+func (c *NullController) ClearDevices(ctx context.Context) error {
+	return ErrNotConnected
+}
+
 func (c *NullController) GetDeviceState(ctx context.Context, id string) (DeviceState, error) {
 	return nil, ErrNotConnected
 }

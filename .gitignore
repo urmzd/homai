@@ -9,3 +9,4 @@ tmp
 .env.*
 .DS_Store
 .idea/
+specs/csa-iot/*.pdf

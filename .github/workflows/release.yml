@@ -3,13 +3,31 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Re-release the current tag"
+        type: boolean
+        default: false
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
+  embed-src:
+    name: Embed-src
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: urmzd/embed-src@v3
+        with:
+          commit-message: "chore: sync embedded files [skip ci]"
+
   ci:
+    needs: embed-src
     uses: ./.github/workflows/ci.yml
 
   release:
@@ -40,6 +58,7 @@ jobs:
         id: sr
         with:
           github-token: ${{ steps.app-token.outputs.token }}
+          force: ${{ inputs.force || false }}
           build-command: |
             mkdir -p bin
             for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do

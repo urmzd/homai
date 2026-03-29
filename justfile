@@ -24,5 +24,24 @@ lint:
     golangci-lint run ./...
     go vet ./...
 
+# Format code
+fmt:
+    gofmt -w .
+
+# Tidy modules
+tidy:
+    go mod tidy
+
+# Run govulncheck
+vuln:
+    govulncheck ./...
+
+# Record showcase with teasr
+record:
+    teasr showme
+
 # Quality gate: lint + test
 check: lint test
+
+# Full CI gate: lint + build + test
+ci: lint build test

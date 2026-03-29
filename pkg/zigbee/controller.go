@@ -182,9 +182,9 @@ func NewController(portPath string) (*Controller, error) {
 	ezsp := NewEZSPLayer(ash)
 
 	c := &Controller{
-		serial:   s,
-		ash:      ash,
-		ezsp:     ezsp,
+		serial:         s,
+		ash:            ash,
+		ezsp:           ezsp,
 		devices:        make(map[string]*KnownDevice),
 		nwkAddrWaiters: make(map[string]chan uint16),
 		stopChan:       make(chan struct{}),

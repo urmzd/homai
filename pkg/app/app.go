@@ -139,4 +139,3 @@ func syncDevicesToConfig(zb *zigbee.Controller, cfg *config.Config) {
 		})
 	}
 }
-

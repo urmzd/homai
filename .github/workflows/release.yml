@@ -65,7 +65,7 @@ jobs:
               GOOS=${target%/*}
               GOARCH=${target#*/}
               output="bin/zigbee-skill-${GOOS}-${GOARCH}"
-              GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build -o "$output" ./cmd/cli
+              GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build -o "$output" ./cmd/zigbee-skill
             done
           artifacts: "bin/*"
 

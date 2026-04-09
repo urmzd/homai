@@ -10,3 +10,4 @@ tmp
 .DS_Store
 .idea/
 specs/csa-iot/*.pdf
+/zigbee-skill

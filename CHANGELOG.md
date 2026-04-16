@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.2 (2026-04-16)
+
+### Refactoring
+
+- replace embed-src references with fsrc (#13) ([0957016](https://github.com/urmzd/zigbee-skill/commit/0957016d5fba38fbf7f08b48f97cc3ab7b045843))
+
+[Full Changelog](https://github.com/urmzd/zigbee-skill/compare/v0.3.1...v0.3.2)
+
+
 ## 0.3.1 (2026-04-16)
 
 ### Bug Fixes

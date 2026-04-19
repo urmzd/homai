@@ -58,3 +58,5 @@ channels:
 
 packages:
   - path: .
+    artifacts:
+      - bin/*

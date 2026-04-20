@@ -1,4 +1,4 @@
-# sr v7 configuration
+# sr configuration
 # Reference: https://github.com/urmzd/sr#configuration
 
 git:
@@ -59,4 +59,7 @@ channels:
 packages:
   - path: .
     artifacts:
-      - bin/*
+      - bin/zigbee-skill-linux-amd64
+      - bin/zigbee-skill-linux-arm64
+      - bin/zigbee-skill-darwin-amd64
+      - bin/zigbee-skill-darwin-arm64

@@ -59,7 +59,7 @@ jobs:
             GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build -o "$output" ./cmd/zigbee-skill
           done
 
-      - uses: urmzd/sr@v7
+      - uses: urmzd/sr@v8
         id: sr
         with:
           github-token: ${{ steps.app-token.outputs.token }}
